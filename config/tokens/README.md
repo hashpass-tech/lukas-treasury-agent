@@ -1,0 +1,1 @@
+Only the deployed local SIMCOP token is allowed in the Simulation vault. Its address and actual precision are recorded in ignored `.local/deployment.json`. No official wFIAT allowlist exists yet; symbols never establish identity. Remote release requires reviewed chain/address/code/decimals/source/time records.

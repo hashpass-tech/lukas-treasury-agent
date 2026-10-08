@@ -1,0 +1,9 @@
+services:
+  treasury:
+    build: .
+    # Linux host networking preserves loopback-only RPC/API/web binding.
+    network_mode: host
+    volumes:
+      - simulation:/app/.local
+volumes:
+  simulation:

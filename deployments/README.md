@@ -1,0 +1,1 @@
+Actual local addresses are generated in ignored `.local/deployment.json` and are bound to that persistent Ganache chain. No Celo deployments exist. Prepared `.local/sepolia-plan.json` and `.local/mainnet-plan.json` are not deployment manifests.

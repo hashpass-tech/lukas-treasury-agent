@@ -1,0 +1,11 @@
+{
+  "eventSlug": "agents-on-open-rails",
+  "eventName": "Agents on Open Rails Hackathon",
+  "track": "Stable Agents: LatAm | Ripio x Celo",
+  "repository": "hashpass-tech/lukas-treasury-agent",
+  "scoringChainId": 42220,
+  "attributionCode": "celo_41fbb6a88a82",
+  "agentWallet": null,
+  "identity": null,
+  "source": "Operator-provided event onboarding and Builder Pack, 2026-10-08"
+}
