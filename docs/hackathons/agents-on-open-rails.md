@@ -22,7 +22,7 @@ Apply ERC-8021 attribution where the wallet client is constructed and verify eve
 
 ## Single agent wallet
 
-- Agent wallet address: **pending — not supplied yet**.
+- Agent wallet address: `0x114d72D97Aa9C413A1ba3f0Cd37F439D668EA1aD` (operator supplied).
 - Use one transaction wallet and keep the same address for the entire event; the score is tied to it.
 - Enter the address at submission or via the Celo button in the playground.
 - Frontend merchant wallets are distinct from the event's agent execution wallet.
@@ -58,8 +58,8 @@ These variable names are the project's proposed configuration schema, not a clai
 
 - [x] Issued event tag recorded from the registration screen.
 - [ ] Confirm the final entry/repository association and whether the entry is individual or a team.
-- [ ] Record the permanent agent wallet address.
-- [ ] Configure the assigned tag on all sending/signing paths.
+- [x] Record the permanent agent wallet address.
+- [x] Configure the assigned tag on all sending/signing paths; verified locally.
 - [ ] Verify mainnet chain ID and funding/gas configuration.
 - [ ] Verify attribution in the actual transaction input before relying on activity scores.
 - [ ] Register ERC-8004 from the same wallet and save the resulting identity evidence before the deadline.

@@ -1,0 +1,25 @@
+# API reference
+
+One configured chain/vault per runtime. Remote private reads and all financial mutations require the current owner wallet session. Owner preparation returns unsigned exact attributed transactions; it never grants API custody. The configured treasury is deployed through the operator CLI, then registered/configured/funded by the owner. Chain effects are recorded only after verification.
+
+| Route                                                                                  | Behavior                                                                                                                              |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/challenge`, `POST /auth/verify`, `POST /auth/logout`                       | Origin/chain-bound one-use wallet challenge; private cookie session                                                                   |
+| `GET /v1/config`                                                                       | Public deployment/mode/identity/write-policy information                                                                              |
+| `GET /v1/treasury`, `GET /v1/treasuries`, `GET /v1/treasuries/:id`                     | Actual configured vault/balances/obligations; private remotely                                                                        |
+| `POST /v1/treasuries`                                                                  | Register the configured owner-controlled vault; rejects another vault                                                                 |
+| `GET /v1/treasuries/:id/policy`                                                        | Current onchain epoch, controls and token limits                                                                                      |
+| `POST /v1/treasuries/:id/policy/prepare`                                               | Exact owner action `{action,args}`: fund, withdraw, pause/unpause, cancelIntent, setToken, setRecipient, setExecutor, configurePolicy |
+| `POST /v1/actions/:id/submitted`, `GET /v1/actions/:id`, `POST /v1/actions/:id/verify` | Persist submitted hash, resume and verify exact canonical transaction/effects/finality                                                |
+| `POST /v1/obligations`                                                                 | Reviewable bounded EIP-712 draft; Idempotency-Key required                                                                            |
+| `GET /v1/obligations/:id`, `POST /v1/obligations/:id/quote`                            | Private obligation/receipt and fresh chain-backed quote                                                                               |
+| `POST /v1/obligations/:id/authorize`                                                   | Verify current owner's exact EIP-712 signature; idempotent authorization schedules worker                                             |
+| `POST /v1/obligations/:id/cancel/prepare`                                              | Owner-signed onchain cancellation preparation                                                                                         |
+| `POST /v1/intents/parse`                                                               | Strict deterministic text-to-draft proposal; no signing/execution authority                                                           |
+| `GET /v1/receipts`, `GET /v1/audit`, `GET /v1/agent`                                   | Scrubbed private evidence and identity information                                                                                    |
+| `GET /.well-known/agent-registration.json`                                             | Inactive metadata draft, not a canonical registration claim                                                                           |
+| `GET /health`, `GET /ready`, `GET /metrics`                                            | Liveness, chain/vault check and private task/heartbeat/pending metrics                                                                |
+
+Amounts are integer strings in token atomic units or LUKAS WAD. Creation body contains recipient, amountLukasWad, maxSettlementAtomic, ISO-8601 dueAt/deadline with timezone, and optional description. The intent binds the configured settlement token, zero reference-token denomination, vault/chain, policy epoch, methodology and salt. Error responses use fixed codes, retryability and correlation identifiers. No unauthenticated execution endpoint exists.
+
+Remote hosting requires trusted HTTPS/public origin, Secure cookies, authenticated private reads, allowed Origin+JSON mutations, bounded request bodies and edge limits. Service credentials and journals never enter response payloads. Cancellation cannot reverse a payment already mined.

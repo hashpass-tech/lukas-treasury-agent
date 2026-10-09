@@ -1,4 +1,4 @@
-import registration from "../../config/hackathon.json";
+import registration from "../../config/hackathon.json" with { type: "json" };
 export const hackathon = registration;
 export function resolveAttributionCode(
   env: Record<string, string | undefined> = process.env,

@@ -29,7 +29,7 @@ export type Snapshot = {
   oldestComponentUpdatedAt: number;
   indexUsdWad: string;
   components: Component[];
-  trustMode: "fixture";
+  trustMode: "fixture" | "testnet-fixture" | "native" | "signed-mirror";
   provenance: string;
 };
 export function quote(
@@ -54,11 +54,20 @@ export function quote(
     denominator = WAD * price;
   return (numerator + denominator - 1n) / denominator;
 }
-export function validateSnapshot(s: Snapshot, now: number, maxAge = 300) {
+export function validateSnapshot(
+  s: Snapshot,
+  now: number,
+  maxAge = 300,
+  chainId = 31337,
+  sourceChainId = chainId,
+) {
   if (
     s.methodologyHash !== methodologyHash ||
-    s.trustMode !== "fixture" ||
-    s.sourceChainId !== 31337
+    !["fixture", "testnet-fixture", "native", "signed-mirror"].includes(
+      s.trustMode,
+    ) ||
+    s.sourceChainId !== sourceChainId ||
+    (chainId === 42220 && ["fixture", "testnet-fixture"].includes(s.trustMode))
   )
     throw new Error("METHODOLOGY_OR_CHAIN");
   if (
@@ -90,7 +99,9 @@ export function validateSnapshot(s: Snapshot, now: number, maxAge = 300) {
     oldest !== s.oldestComponentUpdatedAt ||
     s.observedAt > now ||
     now - s.observedAt > maxAge ||
-    index !== BigInt(s.indexUsdWad)
+    (["native", "signed-mirror"].includes(s.trustMode)
+      ? (index / 10n ** 10n) * 10n ** 10n
+      : index) !== BigInt(s.indexUsdWad)
   )
     throw new Error("INVALID_SNAPSHOT");
 }
@@ -131,13 +142,20 @@ export const domain = (chainId: number, vault: Address) => ({
   verifyingContract: vault,
 });
 export const transitions: Record<string, string[]> = {
-  DRAFT: ["AWAITING_AUTHORIZATION"],
-  AWAITING_AUTHORIZATION: ["SCHEDULED"],
-  SCHEDULED: ["EVALUATING"],
-  EVALUATING: ["BLOCKED", "PREPARED", "EXPIRED"],
-  BLOCKED: ["EVALUATING"],
+  DRAFT: ["QUOTED", "CANCELED"],
+  QUOTED: ["AWAITING_AUTHORIZATION", "DRAFT", "CANCELED"],
+  AWAITING_AUTHORIZATION: ["AUTHORIZED", "CANCELED", "EXPIRED"],
+  AUTHORIZED: ["SCHEDULED", "CANCELED", "EXPIRED"],
+  SCHEDULED: ["EVALUATING", "CANCELED", "EXPIRED"],
+  EVALUATING: ["BLOCKED", "PREPARED", "EXPIRED", "CANCELED"],
+  BLOCKED: ["EVALUATING", "AWAITING_AUTHORIZATION", "CANCELED", "EXPIRED"],
   PREPARED: ["SUBMITTED", "BLOCKED"],
-  SUBMITTED: ["RECONCILED", "FAILED"],
+  SUBMITTED: ["CONFIRMED", "FAILED", "BLOCKED"],
+  CONFIRMED: ["RECONCILED", "SUBMITTED"],
+  RECONCILED: ["SUBMITTED"],
+  FAILED: ["BLOCKED", "CANCELED"],
+  CANCELED: [],
+  EXPIRED: [],
 };
 export function checkTransition(from: string, to: string) {
   if (!transitions[from]?.includes(to))

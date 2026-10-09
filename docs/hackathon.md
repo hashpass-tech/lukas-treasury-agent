@@ -4,7 +4,7 @@ Track: Stable Agents: LatAm | Ripio x Celo. Public event configuration is in `co
 
 Scoring requires **Celo mainnet, chain 42220**. Local chain 31337 and Celo Sepolia 11142220 are development evidence only. Gas requires CELO or a supported stablecoin fee arrangement. No mainnet activity is claimed in this repository.
 
-Use one permanent agent wallet for the entire event. It is currently unassigned; never use the public local mnemonic remotely. Enter its address on the event page, the playground Celo button, or at submission. Register its canonical ERC-8004 identity **from that wallet before the event deadline**. Verify registry code/ABI, metadata resolution, identity ownership and wallet binding; a metadata draft is insufficient. Joining a team requires updating the public project tag and environment together. Earlier personal-tag transactions do not count toward the team.
+Use one permanent agent wallet for the entire event. The operator assigned `0x114d72D97Aa9C413A1ba3f0Cd37F439D668EA1aD`; never use the public local mnemonic remotely. Enter its address on the event page, the playground Celo button, or at submission. Register its canonical ERC-8004 identity **from that wallet before the event deadline**. Verify registry code/ABI, metadata resolution, identity ownership and wallet binding; a metadata draft is insufficient. Joining a team requires updating the public project tag and environment together. Earlier personal-tag transactions do not count toward the team.
 
 Official references:
 

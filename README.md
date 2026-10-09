@@ -1,49 +1,54 @@
 # LUKAS Treasury
 
-Schedule LUKAS-denominated supplier obligations and settle inside owner-signed limits. This first implementation is a **local Simulation vertical slice**, with a JACK-inspired independently implemented runtime. It is not the complete blueprint release or an authorized mainnet pilot.
+Schedule LUKAS-denominated supplier obligations and settle them in a configured local-currency token inside owner-signed limits. The MVP includes the wallet dashboard, authenticated API, independently implemented JACK-inspired financial runtime, durable worker, treasury vault, protected signer service, Celo deployment tools, native/signed-mirror oracle adapters, identity tooling, and tests.
 
-## Quickstart
+**Local baseline verified.** The full Sepolia path is tested through a local HTTPS emulator; actual Sepolia and mainnet acceptance need provisioned signing services, gas and verified network evidence. See [acceptance](docs/acceptance.md). No LKS issuance or redemption promise is made.
 
-Node >=22.13 (Node 24 tested), pnpm 9.15.9. No production keys, RPC services, Docker or paid accounts are needed.
+## Run locally
+
+Node **22.13+** (24.19.0 tested), pnpm **9.15.9**. No production key, paid account or remote RPC is required.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev:local
-# In another terminal, in the repository root:
+# In another terminal, from the repository root:
 pnpm demo:run
 ```
 
-The native stack starts a persistent Ganache EVM (31337, localhost port 8545), Next.js dashboard (port 3000), Hono API (port 3001), and worker. Only loopback interfaces are used. Open port 3000 in your own local browser. The seed deposits an actual mock ERC-20 balance into a deployed vault, signs a bounded 100 LUKAS obligation and schedules a second deliberately over-cap obligation. The worker independently executes the first; the second remains blocked. Repeated demo calls reuse the same obligation IDs and do not pay twice.
+Open http://127.0.0.1:3000. The native stack starts persistent Ganache chain **31337** on port 8545, the dashboard on 3000, API on 3001 and autonomous worker. `demo:run` funds a mock vault, signs a bounded 100-LUKAS obligation and a deliberately over-cap example, and requires the first payment to reconcile. Synthetic prices convert 100 LUKAS to **38,075 SIMCOP**. This is an actual local ERC-20 transfer using synthetic assets and prices. Repeating the demo preserves obligation IDs and cannot pay twice.
 
-The fixture values produce 38,075 SIMCOP for 100 LUKAS. This is synthetic arithmetic and a real local EVM transfer, not Ripio funding or mainnet evidence. Prices expire after five minutes; `pnpm demo:seed` republishes the fixture. Restarting the stack preserves the chain and SQLite database. Never delete only one of them.
+For browser signing, add the local network to an EVM wallet and import the public **local-only** mnemonic `test test test test test test test test test test test junk`; account 0 owns the treasury. Never use or fund these identities remotely. The UI authenticates ownership, reviews exact terms, requests EIP-712 authorization, and schedules payment 15 seconds later. It also prepares owner-reviewed funding, withdrawal, pause/resume, cancellation, recipient changes, token limits, source-age policy and executor rotation. The agent cannot change those controls.
 
-For the browser signing flow, configure an EVM wallet with chain 31337 and local RPC port 8545, and import the **public, local-only** test mnemonic `test test test test test test test test test test test junk`. Account 0 owns the treasury. Never fund these public identities on any remote network. The interface authenticates wallet ownership, shows exact terms, requests EIP-712 authorization, and schedules execution 15 seconds later. CLI signing works without a browser wallet. Local identity generation rejects remote modes and RPC hosts.
+Prices expire after five minutes; `pnpm demo:seed` refreshes them. Restart preserves chain and SQLite together. Do not delete only one. Existing deployments are not automatically upgraded when contract source changes; use a separate fresh simulation directory to deploy a new version while preserving old journals.
 
-## Commands and actual behavior
+## Commands
 
-| Command                                         | Behavior                                                                                                                 |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm demo:seed`                                | Idempotently seeds two owner-signed local obligations and refreshes synthetic prices                                     |
-| `pnpm demo:run`                                 | Seeds, ticks worker, requires a reconciled local payment and prints scrubbed receipts                                    |
-| `pnpm build`                                    | Solidity compilation and Next production build                                                                           |
-| `pnpm typecheck`                                | Strict TypeScript checking                                                                                               |
-| `pnpm lint`                                     | Prettier formatting and strict TypeScript check                                                                          |
-| `pnpm test`                                     | Integer/property, snapshot and storage tests                                                                             |
-| `pnpm test:contracts` / `pnpm test:integration` | Isolated real-EVM contract/API/recovery suite (same suite)                                                               |
-| `pnpm test:e2e`                                 | Browser signing happy path and blocked payment; uses `CHROMIUM_PATH`, system Chromium, or a Playwright-installed browser |
-| `pnpm config:validate`                          | Validates local-only runtime configuration                                                                               |
-| `pnpm deploy:sepolia` / `pnpm deploy:mainnet`   | Writes review plans only, exits 1 to signal deployment not implemented; never sends remote transactions                  |
-| `pnpm identity:prepare`                         | Inactive metadata draft; does not register an identity                                                                   |
-| `pnpm attribution:verify <hash>`                | Decodes local transaction with official SDK; requires configured code                                                    |
-| `pnpm pilot:check`                              | Reports concrete unresolved gates; exits 1                                                                               |
-| `pnpm evidence:export`                          | Scrubbed local receipts and audit checkpoints under ignored `.local/`                                                    |
+| Command                                                 | Result                                                                                                                                   |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm demo:seed` / `pnpm demo:run`                      | Idempotent local obligations; verified local settlement                                                                                  |
+| `pnpm build` / `pnpm typecheck` / `pnpm lint`           | Solidity + production web build; strict types; formatting                                                                                |
+| `pnpm test`                                             | Arithmetic, snapshot, policy, storage, attribution, signer, parser, configuration and identity tests                                     |
+| `pnpm test:contracts`                                   | Native Foundry contract tests, including fuzz, malicious tokens and ERC-1271                                                             |
+| `pnpm test:integration`                                 | Actual isolated EVM/API/recovery/reorg/replacement tests                                                                                 |
+| `pnpm test:e2e`                                         | Browser signing, blocked payment and owner controls                                                                                      |
+| `pnpm test:sepolia-path`                                | Full remote deployment/funding/payment/restart path on a labeled local HTTPS emulator                                                    |
+| `pnpm signer:setup` / `pnpm signer:start`               | Private auth/recovery setup without a signing key; isolated HTTPS signer                                                                 |
+| `pnpm deploy:sepolia`                                   | Prepare testnet plan; `--broadcast` executes with provisioned operator signers                                                           |
+| `pnpm demo:sepolia`                                     | Prepare exact intent; `--broadcast` authorizes and executes the approved testnet demo                                                    |
+| `pnpm deploy:mainnet`                                   | Verify supplied token/source/identity evidence and prepare a hashed plan; guarded `--broadcast` requires explicit reviewed authorization |
+| `pnpm identity:prepare` / `pnpm identity:verify <hash>` | Prepare tagged canonical registration for wallet review; verify actual identity transaction and bindings                                 |
+| `pnpm snapshot:sync` / `pnpm oracle:sync`               | Validate native source data; publish accepted native/mirror rounds while preserving original timestamps                                  |
+| `pnpm dev:api` / `pnpm dev:worker`                      | Separate persistent processes for a configured deployment                                                                                |
+| `pnpm config:validate` / `pnpm pilot:check`             | Validate mode configuration; report required readiness evidence                                                                          |
+| `pnpm attribution:verify <hash>`                        | Decode actual transaction attribution through the official SDK                                                                           |
+| `pnpm evidence:export` / `pnpm demo:capture`            | Scrubbed private receipts/checkpoints; labeled local video/screenshots                                                                   |
 
-Copying `.env.example` is optional. Native scripts use exported variables; they do not load `.env` automatically. SQLite uses WAL, busy timeout, transactional migrations and mode 0600. The signed-byte journal is private local storage; encrypted/remote signer recovery is required before remote use.
+Native scripts use exported variables and **do not automatically load `.env`**. `.env.example` contains safe public defaults/placeholders. Replace or unset `RPC_URL` when changing modes. Keep separate chain/database/manifest paths per network. SQLite is single-host WAL with transactional migrations, nonce uniqueness, renewable leases and private mode-0600 files. Remote recovery requires an authenticated encrypted journal and HTTPS signer/RPC.
 
-## Modes and acceptance
+## Celo and the hackathon
 
-LOCAL is implemented and visibly labeled Simulation. CELO_SEPOLIA (11142220) and CELO_MAINNET_PILOT (42220) have preparation artifacts and explicit blockers only. The runtime cannot execute either remote mode. The issued event attribution code `celo_41fbb6a88a82` is configured on every application signing path. No official wFIAT addresses, canonical identity, token pilot or mainnet transactions are claimed. See [hackathon setup](docs/hackathon.md) for wallet, identity and Builder Pack requirements.
+Modes: LOCAL **31337**, CELO_SEPOLIA **11142220**, CELO_MAINNET_PILOT **42220**. Only mainnet activity counts for Agents on Open Rails / Stable Agents: LatAm | Ripio x Celo. All application transaction paths require official ERC-8021 encoding with **`celo_41fbb6a88a82`** before signing. The permanent event wallet is **`0x114d72D97Aa9C413A1ba3f0Cd37F439D668EA1aD`**. No private key was generated for that wallet.
 
-See [acceptance](docs/acceptance.md), [discovery](docs/discovery.md), [security](docs/security.md), [mainnet readiness](docs/mainnet-readiness.md) and [runbook](docs/runbook.md). On Node 24 Ganache may use its JavaScript fallback instead of a native µWS binary; this is a performance warning, and real contract tests still execute.
+Follow [signer setup](docs/signer.md), [Sepolia](docs/sepolia.md), [mainnet readiness](docs/mainnet-readiness.md), and [hackathon onboarding](docs/hackathon.md). Mainnet writes default off; actual official wFIAT, current accepted prices, canonical ERC-8004 identity, contract/cap review and bounded operator authorization are required. Registration tooling is verified against a clearly labeled test registry, not an existing canonical agent ID.
 
-Optional Linux Docker workflow (not executed in this environment): `docker compose up --build`, then `docker compose exec treasury pnpm demo:run`. Host networking preserves localhost bindings; the named volume preserves simulation chain/database together. Native startup is the verified workflow.
+[Architecture](docs/architecture.md), [API](docs/api.md), [security](docs/security.md), [runbook](docs/runbook.md), [source discovery](docs/discovery.md), [submission draft](docs/submission.md) and [demo](docs/demo-script.md) explain operation and evidence. Ganache uses a JavaScript fallback on Node 24; tests still execute actual EVM contracts. Native setup is verified. Optional Linux `docker compose up --build` and the GitHub Actions workflow are provided; neither Docker nor remote CI was executed in this environment.

@@ -3,6 +3,20 @@ import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 export default function Page() {
   const [data, setData] = useState<any>(),
+    [publicConfig, setPublicConfig] = useState<any>(),
+    [recipient, setRecipient] = useState(""),
+    [dueAt, setDueAt] = useState(""),
+    [deadline, setDeadline] = useState(""),
+    [ownerAction, setOwnerAction] = useState<any>(),
+    [withdrawAmount, setWithdrawAmount] = useState(""),
+    [fundAmount, setFundAmount] = useState(""),
+    [allowedRecipient, setAllowedRecipient] = useState(""),
+    [perPaymentLimit, setPerPaymentLimit] = useState(""),
+    [dailyLimit, setDailyLimit] = useState(""),
+    [oracleAge, setOracleAge] = useState("300"),
+    [nextExecutor, setNextExecutor] = useState(""),
+    [draftText, setDraftText] = useState(""),
+    [language, setLanguage] = useState<"en" | "es">("en"),
     [error, setError] = useState(""),
     [wallet, setWallet] = useState(""),
     [amount, setAmount] = useState("100"),
@@ -29,6 +43,9 @@ export default function Page() {
       request("/v1/treasury")
         .then(setData)
         .catch((e) => setError(e.message));
+    request("/v1/config")
+      .then(setPublicConfig)
+      .catch((e) => setError(e.message));
     refresh();
     const id = setInterval(refresh, 2000);
     return () => clearInterval(id);
@@ -48,15 +65,15 @@ export default function Page() {
     const e = (window as any).ethereum;
     if (!e)
       throw new Error(
-        "Install an EVM wallet; add local RPC port 8545, chain 31337. The CLI demo works without a browser wallet.",
+        `Install an EVM wallet and connect to chain ${publicConfig?.chainId ?? "shown in the dashboard"}.`,
       );
     return e;
   };
   async function connect() {
     const e = ethereum();
     const chain = await e.request({ method: "eth_chainId" });
-    if (chain !== "0x7a69")
-      throw new Error("Switch your wallet to local Simulation chain 31337");
+    if (Number(BigInt(chain)) !== publicConfig?.chainId)
+      throw new Error(`Switch your wallet to chain ${publicConfig?.chainId}`);
     const accounts = await e.request({ method: "eth_requestAccounts" });
     const challenge = await request("/auth/challenge", { wallet: accounts[0] });
     const signature = await e.request({
@@ -65,6 +82,7 @@ export default function Page() {
     });
     await request("/auth/verify", { id: challenge.id, signature });
     setWallet(accounts[0]);
+    setData(await request("/v1/treasury"));
   }
   async function prepare() {
     const now = Date.now();
@@ -72,11 +90,11 @@ export default function Page() {
       await request(
         "/v1/obligations",
         {
-          recipient: data.config.recipient,
+          recipient: recipient || data.config.recipient,
           amountLukasWad: parseUnits(amount, 18).toString(),
-          maxSettlementAtomic: parseUnits(cap, 6).toString(),
-          dueAt: new Date(now + 15000).toISOString(),
-          deadline: new Date(now + 3600000).toISOString(),
+          maxSettlementAtomic: parseUnits(cap, data.config.decimals).toString(),
+          dueAt: dueAt || new Date(now + 15000).toISOString(),
+          deadline: deadline || new Date(now + 3600000).toISOString(),
         },
         crypto.randomUUID(),
       ),
@@ -84,13 +102,18 @@ export default function Page() {
   }
   async function sign() {
     const e = ethereum();
-    if ((await e.request({ method: "eth_chainId" })) !== "0x7a69")
-      throw new Error("Switch to Simulation chain 31337 before signing");
+    if (
+      Number(BigInt(await e.request({ method: "eth_chainId" }))) !==
+      data.config.chainId
+    )
+      throw new Error(`Switch to chain ${data.config.chainId} before signing`);
     const accounts = await e.request({ method: "eth_accounts" });
     if (accounts[0]?.toLowerCase() !== wallet.toLowerCase())
       throw new Error("Owner wallet changed; reconnect before signing");
     const typed = {
-      ...draft,
+      domain: draft.domain,
+      primaryType: draft.primaryType,
+      message: draft.message,
       types: {
         ...draft.types,
         EIP712Domain: [
@@ -101,14 +124,83 @@ export default function Page() {
         ],
       },
     };
-    delete typed.id;
-    delete typed.quoteAtomic;
     const signature = await ethereum().request({
       method: "eth_signTypedData_v4",
       params: [wallet, JSON.stringify(typed)],
     });
-    await request(`/v1/obligations/${draft.id}/authorize`, { signature });
+    await request(
+      `/v1/obligations/${draft.id}/authorize`,
+      { signature },
+      draft.id,
+    );
     setDraft(null);
+  }
+  const strings = {
+    en: {
+      connect: "Connect owner wallet",
+      schedule: "Schedule a supplier payment",
+      pause: "Pause treasury",
+      resume: "Resume treasury",
+      withdraw: "Prepare withdrawal",
+      readiness: "Operator readiness",
+      balance: "FUNDED TREASURY",
+    },
+    es: {
+      connect: "Conectar billetera del propietario",
+      schedule: "Programar pago a proveedor",
+      pause: "Pausar tesorería",
+      resume: "Reanudar tesorería",
+      withdraw: "Preparar retiro",
+      readiness: "Estado del operador",
+      balance: "SALDO DE TESORERÍA",
+    },
+  }[language];
+  async function prepareControl(action: string, args: unknown[]) {
+    setOwnerAction(
+      await request(`/v1/treasuries/${data.config.vault}/policy/prepare`, {
+        action,
+        args,
+      }),
+    );
+  }
+  async function submitControl() {
+    const e = ethereum();
+    if (
+      Number(BigInt(await e.request({ method: "eth_chainId" }))) !==
+      ownerAction.chainId
+    )
+      throw new Error("CHAIN_MISMATCH");
+    const hash =
+      ownerAction.transactionHash ??
+      (await e.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: ownerAction.from,
+            to: ownerAction.to,
+            data: ownerAction.data,
+            value: ownerAction.value,
+          },
+        ],
+      }));
+    setOwnerAction({ ...ownerAction, transactionHash: hash });
+    await request(`/v1/actions/${ownerAction.id}/submitted`, { hash });
+    for (let n = 0; n < 60; n++) {
+      const receipt = await e.request({
+        method: "eth_getTransactionReceipt",
+        params: [hash],
+      });
+      if (receipt) {
+        await request(`/v1/actions/${ownerAction.id}/verify`, { hash });
+        setOwnerAction(null);
+        setData(await request("/v1/treasury"));
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    throw new Error(
+      `Transaction pending: ${hash}; verify the chain result before retrying.`,
+    );
   }
   return (
     <main>
@@ -116,7 +208,16 @@ export default function Page() {
         <a className="brand" href="/">
           L<span>U</span>KAS <small>TREASURY</small>
         </a>
-        <span className="badge">SIMULATION · CHAIN 31337</span>
+        <span className="badge">
+          {publicConfig?.mode ?? "Connecting"} · CHAIN{" "}
+          {publicConfig?.chainId ?? "…"}
+        </span>
+        <button
+          onClick={() => setLanguage(language === "en" ? "es" : "en")}
+          aria-label="Change language"
+        >
+          {language === "en" ? "Español" : "English"}
+        </button>
       </header>
       <section className="hero">
         <p className="eyebrow">REGIONAL VALUE. LOCAL SETTLEMENT.</p>
@@ -130,8 +231,12 @@ export default function Page() {
           token, within terms you sign.
         </p>
         <div className="notice">
-          Local EVM and synthetic prices · SIMCOP is a mock token ·
-          JACK-inspired runtime; upstream integration pending licensing.
+          {publicConfig?.chainId === 42220
+            ? "Celo mainnet · reviewed assets and oracle policy required"
+            : publicConfig?.chainId === 11142220
+              ? "Celo Sepolia · TESTCOP synthetic test asset · no event credit"
+              : "Local EVM and synthetic prices · SIMCOP is a mock token"}{" "}
+          · JACK-inspired runtime; upstream integration pending licensing.
         </div>
       </section>
       {error && (
@@ -140,43 +245,86 @@ export default function Page() {
         </p>
       )}
       {!data ? (
-        <p>Connecting to local treasury…</p>
+        <div>
+          <p>Connect to load your treasury.</p>
+          <button disabled={!publicConfig || busy} onClick={() => act(connect)}>
+            {strings.connect}
+          </button>
+        </div>
       ) : (
         <>
           <section className="stats">
             <article>
-              <label>FUNDED TREASURY</label>
+              <label>{strings.balance}</label>
               <h2>
-                {formatUnits(BigInt(data.balanceAtomic), 6)}{" "}
-                <small>SIMCOP</small>
+                {formatUnits(BigInt(data.balanceAtomic), data.config.decimals)}{" "}
+                <small>{data.config.symbol ?? "SIMCOP"}</small>
               </h2>
-              <p>Read directly from the local token contract</p>
+              <p>Read directly from the deployed token contract</p>
             </article>
             <article>
               <label>LUKAS REFERENCE VALUE</label>
               <h2>${formatUnits(BigInt(data.snapshot.indexUsdWad), 18)}</h2>
-              <p>Fixture basket · USD per reference unit</p>
+              <p>{data.snapshot.trustMode} basket · USD per reference unit</p>
             </article>
             <article>
               <label>SUPPLIER RECEIVED</label>
               <h2>
-                {formatUnits(BigInt(data.recipientBalanceAtomic), 6)}{" "}
-                <small>SIMCOP</small>
+                {formatUnits(
+                  BigInt(data.recipientBalanceAtomic),
+                  data.config.decimals,
+                )}{" "}
+                <small>{data.config.symbol ?? "SIMCOP"}</small>
               </h2>
-              <p>Actual balance on the simulation EVM</p>
+              <p>Actual balance on the configured chain</p>
             </article>
           </section>
           <section className="workspace">
             <article className="compose">
               <p className="eyebrow">BOUNDED AUTHORIZATION</p>
-              <h2>Schedule a supplier payment</h2>
+              <h2>{strings.schedule}</h2>
               <p>
                 One recipient. One token. One maximum. A signature authorizes
                 only these terms.
               </p>
               <button disabled={busy} onClick={() => act(connect)}>
-                {wallet ? "Wallet connected" : "Connect owner wallet"}
+                {wallet ? "Wallet connected" : strings.connect}
               </button>
+              <details>
+                <summary>Optional text draft · deterministic parser</summary>
+                <label>
+                  Explicit payment terms
+                  <textarea
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    placeholder={`pay 1 LUKAS to ${data.config.recipient} max 500 ${data.config.symbol ?? "SIMCOP"} due 2026-10-30T10:00:00-05:00 until 2026-10-30T11:00:00-05:00`}
+                  />
+                </label>
+                <button
+                  disabled={!wallet || busy}
+                  onClick={() =>
+                    act(async () => {
+                      const p = await request("/v1/intents/parse", {
+                        text: draftText,
+                      });
+                      setAmount(formatUnits(BigInt(p.amountLukasWad), 18));
+                      setCap(
+                        formatUnits(
+                          BigInt(p.maxSettlementAtomic),
+                          data.config.decimals,
+                        ),
+                      );
+                      setRecipient(p.recipient);
+                      setDueAt(p.dueAt);
+                      setDeadline(p.deadline);
+                      setDraft(null);
+                    })
+                  }
+                >
+                  Parse into review form
+                </button>
+                <p>Produces a draft only. It cannot sign or send money.</p>
+              </details>
               <label>
                 LUKAS denomination
                 <input
@@ -189,7 +337,7 @@ export default function Page() {
                 />
               </label>
               <label>
-                Maximum SIMCOP settlement
+                Maximum {data.config.symbol ?? "SIMCOP"} settlement
                 <input
                   value={cap}
                   onChange={(e) => {
@@ -199,7 +347,46 @@ export default function Page() {
                   inputMode="decimal"
                 />
               </label>
-              <p className="mono">Recipient {data.config.recipient}</p>
+              <label>
+                Supplier wallet
+                <input
+                  value={recipient || data.config.recipient}
+                  onChange={(e) => {
+                    setRecipient(e.target.value);
+                    setDraft(null);
+                  }}
+                />
+              </label>
+              <label>
+                Settlement token
+                <select aria-label="Settlement token">
+                  <option>
+                    {data.config.symbol ?? "SIMCOP"} · {data.config.token}
+                  </option>
+                </select>
+              </label>
+              <label>
+                Due time (ISO-8601 with timezone; default in 15 seconds)
+                <input
+                  placeholder="2026-10-30T12:00:00-05:00"
+                  value={dueAt}
+                  onChange={(e) => {
+                    setDueAt(e.target.value);
+                    setDraft(null);
+                  }}
+                />
+              </label>
+              <label>
+                Expiry (ISO-8601 with timezone; default in 1 hour)
+                <input
+                  placeholder="2026-10-30T13:00:00-05:00"
+                  value={deadline}
+                  onChange={(e) => {
+                    setDeadline(e.target.value);
+                    setDraft(null);
+                  }}
+                />
+              </label>
               <button disabled={!wallet || busy} onClick={() => act(prepare)}>
                 Review exact terms
               </button>
@@ -208,13 +395,21 @@ export default function Page() {
                   <h3>Review before signing</h3>
                   <p>
                     {formatUnits(BigInt(draft.message.amountLukasWad), 18)}{" "}
-                    LUKAS → quoted {formatUnits(BigInt(draft.quoteAtomic), 6)}{" "}
-                    SIMCOP
+                    LUKAS → quoted{" "}
+                    {formatUnits(
+                      BigInt(draft.quoteAtomic),
+                      data.config.decimals,
+                    )}{" "}
+                    {data.config.symbol ?? "SIMCOP"}
                   </p>
                   <p>
                     Maximum{" "}
-                    {formatUnits(BigInt(draft.message.maxSettlementAtomic), 6)}{" "}
-                    SIMCOP · policy epoch {draft.message.policyEpoch}
+                    {formatUnits(
+                      BigInt(draft.message.maxSettlementAtomic),
+                      data.config.decimals,
+                    )}{" "}
+                    {data.config.symbol ?? "SIMCOP"} · policy epoch{" "}
+                    {draft.message.policyEpoch}
                   </p>
                   <p>
                     Due{" "}
@@ -242,7 +437,7 @@ export default function Page() {
                       timeZone: "America/Bogota",
                     })}{" "}
                     (Bogotá). Quote is indicative; execution uses a fresh
-                    fixture round within your signed cap.
+                    accepted round within your signed cap.
                   </p>
                   <button disabled={busy} onClick={() => act(sign)}>
                     Sign bounded obligation
@@ -285,9 +480,32 @@ export default function Page() {
                     </div>
                     <p className="mono">
                       {o.id.slice(0, 18)}… · max{" "}
-                      {formatUnits(BigInt(o.intent.maxSettlementAtomic), 6)}{" "}
-                      SIMCOP
+                      {formatUnits(
+                        BigInt(o.intent.maxSettlementAtomic),
+                        data.config.decimals,
+                      )}{" "}
+                      {data.config.symbol ?? "SIMCOP"}
                     </p>
+                    {wallet &&
+                      !["RECONCILED", "CANCELED", "EXPIRED"].includes(
+                        o.state,
+                      ) && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            act(async () =>
+                              setOwnerAction(
+                                await request(
+                                  `/v1/obligations/${o.id}/cancel/prepare`,
+                                  {},
+                                ),
+                              ),
+                            )
+                          }
+                        >
+                          Prepare cancellation
+                        </button>
+                      )}
                     {o.reason && <p className="reason">Unpaid: {o.reason}</p>}
                     {o.receipt && (
                       <details>
@@ -295,9 +513,9 @@ export default function Page() {
                           Chain-backed receipt ·{" "}
                           {formatUnits(
                             BigInt(o.receipt.actualSettlementAtomic),
-                            6,
+                            o.receipt.decimals,
                           )}{" "}
-                          SIMCOP
+                          {o.receipt.symbol}
                         </summary>
                         <p className="mono">
                           Transaction: {o.receipt.transactionHash}
@@ -309,8 +527,11 @@ export default function Page() {
                           Oracle round: {o.receipt.oracleRound}
                         </p>
                         <p>
-                          Local transaction; no mainnet evidence, identity
-                          registration, or eligible attribution.
+                          {o.receipt.chainId === 31337
+                            ? "Local transaction; no mainnet evidence, identity registration, or eligible attribution."
+                            : o.receipt.chainId === 11142220
+                              ? "Celo Sepolia test receipt; no mainnet event credit."
+                              : "Celo mainnet receipt. Confirm the wallet, attribution and identity against the event registration."}
                         </p>
                       </details>
                     )}
@@ -319,9 +540,240 @@ export default function Page() {
               )}
             </article>
           </section>
+          <section className="compose">
+            <h2>Owner controls</h2>
+            <p>
+              Only your wallet can pause, withdraw, cancel or change policy. A
+              prepared action becomes effective after its successful chain
+              transaction is verified.
+            </p>
+            <button
+              disabled={!wallet || busy}
+              onClick={() =>
+                act(() =>
+                  prepareControl(data.policy.paused ? "unpause" : "pause", []),
+                )
+              }
+            >
+              {data.policy.paused ? strings.resume : strings.pause}
+            </button>
+            <label>
+              Funding amount
+              <input
+                value={fundAmount}
+                onChange={(e) => setFundAmount(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
+            <button
+              disabled={!wallet || busy || !fundAmount}
+              onClick={() =>
+                act(() =>
+                  prepareControl("fund", [
+                    parseUnits(fundAmount, data.config.decimals).toString(),
+                  ]),
+                )
+              }
+            >
+              Prepare treasury funding
+            </button>
+            <label>
+              Withdrawal amount
+              <input
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
+            <button
+              disabled={!wallet || busy || !withdrawAmount}
+              onClick={() =>
+                act(() =>
+                  prepareControl("withdraw", [
+                    data.config.token,
+                    wallet,
+                    parseUnits(withdrawAmount, data.config.decimals).toString(),
+                  ]),
+                )
+              }
+            >
+              {strings.withdraw}
+            </button>
+            <details>
+              <summary>Recipients and policy</summary>
+              <p>
+                Changing recipients, token limits, executor or source age
+                invalidates existing authorizations. Review and sign replacement
+                obligations after the change.
+              </p>
+              <label>
+                Recipient to configure
+                <input
+                  value={allowedRecipient}
+                  onChange={(e) => setAllowedRecipient(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={!wallet || busy || !allowedRecipient}
+                onClick={() =>
+                  act(() =>
+                    prepareControl("setRecipient", [allowedRecipient, true]),
+                  )
+                }
+              >
+                Allow recipient
+              </button>
+              <button
+                disabled={!wallet || busy || !allowedRecipient}
+                onClick={() =>
+                  act(() =>
+                    prepareControl("setRecipient", [allowedRecipient, false]),
+                  )
+                }
+              >
+                Remove recipient
+              </button>
+              <label>
+                Per-payment token limit
+                <input
+                  value={perPaymentLimit}
+                  onChange={(e) => setPerPaymentLimit(e.target.value)}
+                  inputMode="decimal"
+                />
+              </label>
+              <label>
+                Daily token limit
+                <input
+                  value={dailyLimit}
+                  onChange={(e) => setDailyLimit(e.target.value)}
+                  inputMode="decimal"
+                />
+              </label>
+              <button
+                disabled={!wallet || busy || !perPaymentLimit || !dailyLimit}
+                onClick={() =>
+                  act(() =>
+                    prepareControl("setToken", [
+                      data.config.token,
+                      data.config.decimals,
+                      true,
+                      parseUnits(
+                        perPaymentLimit,
+                        data.config.decimals,
+                      ).toString(),
+                      parseUnits(dailyLimit, data.config.decimals).toString(),
+                    ]),
+                  )
+                }
+              >
+                Prepare token limits
+              </button>
+              <label>
+                Maximum source age (seconds)
+                <input
+                  value={oracleAge}
+                  onChange={(e) => setOracleAge(e.target.value)}
+                  inputMode="numeric"
+                />
+              </label>
+              <button
+                disabled={!wallet || busy}
+                onClick={() =>
+                  act(() => prepareControl("configurePolicy", [oracleAge]))
+                }
+              >
+                Prepare source freshness policy
+              </button>
+              <label>
+                Replacement executor
+                <input
+                  value={nextExecutor}
+                  onChange={(e) => setNextExecutor(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={!wallet || busy || !nextExecutor}
+                onClick={() =>
+                  act(() => prepareControl("setExecutor", [nextExecutor]))
+                }
+              >
+                Prepare executor rotation
+              </button>
+            </details>
+            {data.pendingOwnerActions?.map((a: any) => (
+              <button
+                key={a.id}
+                disabled={busy}
+                onClick={() => setOwnerAction(a)}
+              >
+                Resume verification: {a.action} ·{" "}
+                {a.transactionHash.slice(0, 14)}…
+              </button>
+            ))}
+            {ownerAction && (
+              <div className="review">
+                <h3>Review owner transaction</h3>
+                <p>
+                  {ownerAction.action} · chain {ownerAction.chainId}
+                </p>
+                <p className="mono">
+                  Destination {ownerAction.to}
+                  <br />
+                  Arguments {JSON.stringify(ownerAction.args)}
+                </p>
+                <button disabled={busy} onClick={() => act(submitControl)}>
+                  {ownerAction.transactionHash
+                    ? "Verify submitted owner transaction"
+                    : "Send reviewed owner transaction"}
+                </button>
+              </div>
+            )}
+          </section>
+          <section className="compose">
+            <h2>{strings.readiness}</h2>
+            <p>
+              Source: {data.snapshot.trustMode} · oldest component{" "}
+              {new Date(
+                data.snapshot.oldestComponentUpdatedAt * 1000,
+              ).toLocaleString()}{" "}
+              ·{" "}
+              {Date.now() / 1000 - data.snapshot.oldestComponentUpdatedAt >
+              data.policy.maximumOracleAgeSeconds
+                ? "STALE — execution blocked"
+                : "fresh"}
+            </p>
+            <p>
+              Policy epoch {data.policy.policyEpoch} · paused{" "}
+              {String(data.policy.paused)} · per-payment cap{" "}
+              {formatUnits(
+                BigInt(data.policy.tokenPolicy[2]),
+                data.config.decimals,
+              )}{" "}
+              · daily cap{" "}
+              {formatUnits(
+                BigInt(data.policy.tokenPolicy[3]),
+                data.config.decimals,
+              )}
+            </p>
+            <p className="mono">
+              Agent {data.config.executor}
+              <br />
+              Attribution {data.agent.attributionCode}
+              <br />
+              ERC-8004 identity: {data.agent.identity ?? "unregistered"}
+            </p>
+            <p>
+              Local/testnet transactions do not count toward the event. Mainnet
+              requires reviewed asset/oracle provenance, identity and explicit
+              operator authorization.
+            </p>
+          </section>
           <footer>
             Powered by JACK principles · Owner controls custody · Daily caps
-            reset at UTC midnight · Mainnet disabled
+            reset at UTC midnight ·{" "}
+            {publicConfig?.mainnetWrites
+              ? "Reviewed mainnet writes enabled"
+              : "Mainnet writes disabled"}
           </footer>
         </>
       )}

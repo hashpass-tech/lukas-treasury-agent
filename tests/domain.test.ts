@@ -68,6 +68,19 @@ describe("exact financial arithmetic", () => {
 describe("source freshness and methodology", () => {
   it("accepts a complete current basket", () =>
     expect(() => validateSnapshot(snapshot(), 1000)).not.toThrow());
+  it("native and signed mirrors preserve the upstream eight-decimal index truncation", () => {
+    for (const trustMode of ["native", "signed-mirror"] as const) {
+      const s = snapshot();
+      s.trustMode = trustMode;
+      s.components = s.components.map((c) => ({
+        ...c,
+        usdWad: (WAD + 1n).toString(),
+      }));
+      expect(() => validateSnapshot(s, 1000)).not.toThrow();
+      s.indexUsdWad = (WAD + 1n).toString();
+      expect(() => validateSnapshot(s, 1000)).toThrow("INVALID_SNAPSHOT");
+    }
+  });
   it("blocks republished stale source input", () => {
     const s = snapshot(500);
     s.observedAt = 1000;

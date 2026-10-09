@@ -5,7 +5,7 @@
   "repository": "hashpass-tech/lukas-treasury-agent",
   "scoringChainId": 42220,
   "attributionCode": "celo_41fbb6a88a82",
-  "agentWallet": null,
+  "agentWallet": "0x114d72D97Aa9C413A1ba3f0Cd37F439D668EA1aD",
   "identity": null,
   "source": "Operator-provided event onboarding and Builder Pack, 2026-10-08"
 }

@@ -28,6 +28,7 @@ it("journal uniqueness and transactional audit trail", () => {
   s.attempt("one", "hash", "raw", 1);
   expect(() => s.attempt("one", "hash2", "raw2", 2)).toThrow();
   const audit = s.db.prepare("SELECT * FROM audit ORDER BY seq").all() as any[];
-  expect(audit[1].previousHash).toBe(audit[0].hash);
+  for (let n = 1; n < audit.length; n++)
+    expect(audit[n].previousHash).toBe(audit[n - 1].hash);
   s.close();
 });

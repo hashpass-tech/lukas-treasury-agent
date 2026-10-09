@@ -5,20 +5,22 @@ import {
 import { installSafeErrors } from "./safe-errors.js";
 if (process.argv[1]?.endsWith("/ops.ts")) installSafeErrors();
 import fs from "node:fs";
+import { runtimeConfig } from "../packages/core/config.js";
 import { Store } from "../packages/core/storage.js";
-import {
-  assertLocal,
-  clients,
-  manifest,
-  artifacts,
-} from "../packages/core/chain.js";
+import { assertLocal, clients, manifest } from "../packages/core/chain.js";
 import { verifyTx } from "../packages/core/attribution.js";
-import { stringify } from "../packages/core/domain.js";
 const command = process.argv[2];
 if (command === "validate") {
-  assertLocal();
+  const config = runtimeConfig();
+  if (config.mode === "LOCAL") assertLocal();
   console.log(
-    "LOCAL configuration valid. Remote modes are blocked in this release.",
+    JSON.stringify({
+      valid: true,
+      mode: config.mode,
+      chainId: config.chainId,
+      attributionCode: config.attributionCode,
+      mainnetWrites: process.env.MAINNET_WRITES === "true",
+    }),
   );
 } else if (command === "evidence") {
   const store = new Store();
@@ -30,7 +32,12 @@ if (command === "validate") {
   fs.writeFileSync(
     ".local/evidence.json",
     JSON.stringify(
-      { mode: "Simulation", eligibleMainnetEvidence: false, receipts },
+      {
+        mode: manifest().mode,
+        eligibleMainnetEvidence: false,
+        event: hackathon,
+        receipts,
+      },
       null,
       2,
     ),
@@ -44,30 +51,7 @@ if (command === "validate") {
   );
   store.close();
   console.log(
-    `Exported ${receipts.length} local receipts, without signatures, raw transactions or supplier descriptions.`,
-  );
-} else if (command === "identity") {
-  fs.mkdirSync(".local", { recursive: true });
-  fs.writeFileSync(
-    ".local/agent-registration.draft.json",
-    JSON.stringify(
-      {
-        type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-        name: "LUKAS Treasury",
-        description:
-          "Local simulation; JACK-inspired treasury runtime. No canonical agent registration yet.",
-        image: "",
-        services: [],
-        active: false,
-        x402Support: false,
-        registrations: [],
-      },
-      null,
-      2,
-    ),
-  );
-  console.log(
-    "Inactive metadata draft prepared. No agent ID or registry address invented. Registration and standards validation remain pending.",
+    `Exported ${receipts.length} ${manifest().mode} receipts, without signatures, raw transactions or supplier descriptions.`,
   );
 } else if (command === "attribution") {
   const hash = process.argv[3];
@@ -77,68 +61,6 @@ if (command === "validate") {
     client: clients().publicClient,
     hash: hash as `0x${string}`,
   });
-  console.log(JSON.stringify({ mode: "Simulation", result }));
+  console.log(JSON.stringify({ mode: manifest().mode, result }));
   if (!result?.codes.includes(resolveAttributionCode())) process.exitCode = 1;
-} else if (command === "sepolia" || command === "mainnet") {
-  fs.mkdirSync(".local", { recursive: true });
-  const contracts = artifacts();
-  const plan = {
-    status: "PREPARATION_ONLY",
-    chainId: command === "sepolia" ? 11142220 : 42220,
-    mode: command === "sepolia" ? "CELO_SEPOLIA" : "CELO_MAINNET_PILOT",
-    writesEnabled: false,
-    event: hackathon,
-    contracts: Object.entries(contracts).map(([name, a]: [string, any]) => ({
-      name,
-      abi: a.abi,
-      bytecode: `0x${a.evm.bytecode.object}`,
-    })),
-    blockers:
-      command === "mainnet"
-        ? [
-            "FixtureOracle cannot be deployed as a mainnet price source",
-            "Verified wFIAT allowlist and accepted price provenance",
-            "Canonical ERC-8004 identity registered from the permanent agent wallet",
-            "Reviewed contract/configuration and exposure limits",
-            "Explicit operator authorization",
-          ]
-        : [
-            "Reviewed remote deployer/signer and testnet gas",
-            "RPC chain verification",
-            "Remote deployment, funding, worker and reconciliation adapter not implemented",
-          ],
-  };
-  fs.writeFileSync(`.local/${command}-plan.json`, stringify(plan));
-  console.log(
-    `Prepared ${command} review artifact; no transactions sent. Remote execution is not implemented.`,
-  );
-  process.exitCode = 1;
-} else if (command === "pilot") {
-  console.log(
-    JSON.stringify(
-      {
-        ready: false,
-        mainnetWrites: false,
-        event: hackathon,
-        gates: {
-          localDemo: "implemented",
-          testnet: "pending",
-          officialWfiat: "unverified",
-          oracle: "fixture-only",
-          identity: "unregistered",
-          issuedAttribution:
-            resolveAttributionCode() === hackathon.attributionCode
-              ? "configured"
-              : "simulation-override",
-          agentWallet: hackathon.agentWallet ?? "unassigned",
-          operatorAuthorization: "missing",
-          securityReview: "pending",
-          protocolIssuance: "separate-release",
-        },
-      },
-      null,
-      2,
-    ),
-  );
-  process.exitCode = 1;
 } else throw new Error("Unknown operation");

@@ -12,7 +12,14 @@ import {
   type Address,
   type Abi,
   type Hex,
+  type LocalAccount,
 } from "viem";
+import { runtimeConfig, publicAddress } from "./config.js";
+import { Store } from "./storage.js";
+import { durableDispatch } from "./dispatch.js";
+import { prepareAttributedTransaction } from "./attribution.js";
+import { encodeFunctionData } from "viem";
+import { remoteAccount } from "./signer.js";
 import { mnemonicToAccount } from "viem/accounts";
 import { withAttribution, assertAttributedCalldata } from "./attribution.js";
 import { compile } from "../../scripts/compile.js";
@@ -45,14 +52,37 @@ export function assertLocal() {
     throw new Error("LOCAL_RPC_REQUIRED");
 }
 export function clients() {
-  assertLocal();
-  const rpc = process.env.RPC_URL ?? "http://127.0.0.1:8545";
-  const transport = http(rpc);
-  const wallet = (account: ReturnType<typeof mnemonicToAccount>) => {
+  // Public reads remain available after pilot authorization expires. Each remote
+  // signing operation independently enforces its role's write authorization.
+  const config = runtimeConfig({ readOnly: true });
+  if (config.mode === "LOCAL") assertLocal();
+  const chain =
+    config.mode === "LOCAL"
+      ? localChain
+      : defineChain({
+          id: config.chainId,
+          name: config.mode,
+          nativeCurrency: { name: "Celo", symbol: "CELO", decimals: 18 },
+          rpcUrls: { default: { http: [config.rpc] } },
+        });
+  const transport = http(config.rpc);
+  const wallet = (account: LocalAccount) => {
+    const guarded = {
+      ...account,
+      signTransaction: async (
+        ...args: Parameters<typeof account.signTransaction>
+      ) => {
+        assertAttributedCalldata(
+          args[0].data ?? "0x",
+          resolveAttributionCode(),
+        );
+        return account.signTransaction(...args);
+      },
+    } as LocalAccount;
     const client = createWalletClient({
-      chain: localChain,
+      chain,
       transport,
-      account,
+      account: guarded,
     });
     const code = resolveAttributionCode();
     const tagged = client.extend(withAttribution(code));
@@ -85,20 +115,35 @@ export function clients() {
       },
     };
   };
-  const accounts = [0, 1, 2, 3].map((addressIndex) =>
-    mnemonicToAccount(localMnemonic, { addressIndex }),
-  );
+  const accounts =
+    config.mode === "LOCAL"
+      ? [0, 1, 2, 3].map((addressIndex) =>
+          mnemonicToAccount(localMnemonic, { addressIndex }),
+        )
+      : [
+          remoteAccount(publicAddress("MERCHANT_WALLET_ADDRESS"), "owner"),
+          remoteAccount(publicAddress("AGENT_WALLET_ADDRESS"), "executor"),
+          { address: publicAddress("RECIPIENT_ADDRESS") } as LocalAccount,
+          remoteAccount(publicAddress("PUBLISHER_WALLET_ADDRESS"), "publisher"),
+        ];
   return {
-    publicClient: createPublicClient({ chain: localChain, transport }),
+    publicClient: createPublicClient({ chain, transport }),
     owner: wallet(accounts[0]),
+    deployer:
+      config.mode === "LOCAL"
+        ? wallet(accounts[0])
+        : wallet(
+            remoteAccount(publicAddress("DEPLOYER_WALLET_ADDRESS"), "deployer"),
+          ),
     executor: wallet(accounts[1]),
     publisher: wallet(accounts[3]),
     recipient: accounts[2].address,
   };
 }
 export type Manifest = {
-  chainId: 31337;
-  mode: "Simulation";
+  chainId: number;
+  mode: "Simulation" | "Celo Sepolia" | "Celo Mainnet Pilot";
+  symbol?: string;
   vault: Address;
   token: Address;
   oracle: Address;
@@ -115,7 +160,9 @@ export const artifacts = () =>
     ? JSON.parse(fs.readFileSync(".local/contracts.json", "utf8"))
     : compile();
 export const manifest = (): Manifest =>
-  JSON.parse(fs.readFileSync(".local/deployment.json", "utf8"));
+  JSON.parse(
+    fs.readFileSync(runtimeConfig({ readOnly: true }).manifestPath, "utf8"),
+  );
 export async function setup() {
   assertLocal();
   fs.mkdirSync(".local", { recursive: true, mode: 0o700 });
@@ -239,6 +286,7 @@ async function setupUnlocked() {
   return m;
 }
 export async function publishFixture(m = manifest(), stale = false) {
+  if (m.chainId === 42220) throw new Error("NO_MAINNET_FIXTURE");
   const c = clients(),
     a = artifacts();
   const block = await c.publicClient.getBlock();
@@ -255,17 +303,41 @@ export async function publishFixture(m = manifest(), stale = false) {
       (sum, [k, w]) => sum + prices[k as keyof typeof prices] * BigInt(w),
       0n,
     ) / 10000n;
-  const hash = await c.publisher.writeContract({
+  let hash: Hex;
+  const request = {
     address: m.oracle,
     abi: a.FixtureOracle.abi,
     functionName: "publish",
     args: [index, prices.COP, BigInt(timestamp), methodologyHash],
-  });
-  await c.publicClient.waitForTransactionReceipt({ hash });
+  };
+  if (m.chainId === 31337) {
+    hash = await c.publisher.writeContract(request);
+    await c.publicClient.waitForTransactionReceipt({ hash });
+  } else {
+    const store = new Store();
+    try {
+      const receipt = await durableDispatch(
+        store,
+        `fixture:${timestamp}`,
+        c,
+        c.publisher,
+        {
+          to: m.oracle,
+          data: prepareAttributedTransaction(
+            encodeFunctionData(request),
+            resolveAttributionCode(),
+          ),
+        },
+      );
+      hash = receipt.transactionHash;
+    } finally {
+      store.close();
+    }
+  }
   const s: Snapshot = {
     snapshotId: hash,
     methodologyHash,
-    sourceChainId: 31337,
+    sourceChainId: m.chainId,
     sourceContract: m.oracle,
     sourceBlockNumber: block.number.toString(),
     sourceBlockHash: block.hash,
@@ -278,10 +350,10 @@ export async function publishFixture(m = manifest(), stale = false) {
       usdWad: prices[currency as keyof typeof prices].toString(),
       updatedAt: timestamp,
     })),
-    trustMode: "fixture",
+    trustMode: m.chainId === 31337 ? "fixture" : "testnet-fixture",
     provenance: "Synthetic raw-unit prices; not market or official Ripio data",
   };
-  fs.writeFileSync(".local/snapshot.json", stringify(s));
+  fs.writeFileSync(runtimeConfig().snapshotPath, stringify(s));
   return s;
 }
 export async function balance(address: Address) {

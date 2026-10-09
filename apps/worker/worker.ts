@@ -17,6 +17,12 @@ import {
   verifyTx,
 } from "../../packages/core/attribution.js";
 import { Store } from "../../packages/core/storage.js";
+import { replaceAttempt } from "../../packages/core/replacement.js";
+import {
+  runtimeConfig,
+  assertMainnetAuthorization,
+} from "../../packages/core/config.js";
+import { evaluatePolicy, type Policy } from "../../packages/core/policy.js";
 import { clients, artifacts, manifest } from "../../packages/core/chain.js";
 import {
   domain,
@@ -26,7 +32,20 @@ import {
   validateSnapshot,
   type Snapshot,
 } from "../../packages/core/domain.js";
-export async function tick(store: Store, stopAfterJournal = false) {
+export async function tick(
+  store: Store,
+  stopAfterJournal = false,
+  stopBeforeSign = false,
+) {
+  const config = runtimeConfig({ readOnly: true });
+  let writesEnabled = true;
+  if (config.mode === "CELO_MAINNET_PILOT") {
+    try {
+      assertMainnetAuthorization();
+    } catch {
+      writesEnabled = false;
+    }
+  }
   const owner = randomUUID();
   if (!store.lease(owner)) return;
   store.db
@@ -37,6 +56,7 @@ export async function tick(store: Store, stopAfterJournal = false) {
   const c = clients(),
     m = manifest(),
     a = artifacts();
+  store.bind(m.chainId, m.vault);
   const heartbeat = setInterval(() => store.lease(owner), 10000);
   try {
     if ((await c.publicClient.getChainId()) !== m.chainId)
@@ -65,6 +85,10 @@ export async function tick(store: Store, stopAfterJournal = false) {
         if (!(error instanceof TransactionReceiptNotFoundError)) return;
       }
       if (!receipt) {
+        const currentAttempt = store.db
+          .prepare("SELECT active FROM attempts WHERE hash=?")
+          .get(attempt.hash) as { active: number };
+        if (!currentAttempt.active) continue;
         let known = false;
         try {
           await c.publicClient.getTransaction({ hash: attempt.hash as Hex });
@@ -72,7 +96,45 @@ export async function tick(store: Store, stopAfterJournal = false) {
         } catch (error) {
           if (!(error instanceof TransactionNotFoundError)) return;
         }
+        if (
+          writesEnabled &&
+          known &&
+          Date.now() - attempt.created >
+            Number(process.env.PENDING_REPLACEMENT_MS ?? 120000) &&
+          store.attempts().filter((a) => a.obligation === o.id).length < 3
+        ) {
+          try {
+            await replaceAttempt(store, attempt, owner);
+          } catch {
+            store.db
+              .prepare(
+                "UPDATE obligations SET reason='REPLACEMENT_GAS_CAP_OR_RPC' WHERE id=?",
+              )
+              .run(o.id);
+          }
+          return;
+        }
         if (!known) {
+          if (!writesEnabled) continue;
+          const nonce = await c.publicClient.getTransactionCount({
+            address: c.executor.account.address,
+            blockTag: "latest",
+          });
+          const paid = await c.publicClient.readContract({
+            address: m.vault,
+            abi: a.TreasuryVault.abi,
+            functionName: "isPaid",
+            args: [o.id],
+          });
+          if (nonce > attempt.nonce || paid) {
+            store.db
+              .prepare(
+                "UPDATE obligations SET reason='NONCE_OR_PAYMENT_REQUIRES_RECONCILIATION' WHERE id=?",
+              )
+              .run(o.id);
+            return;
+          }
+
           // Never rewrite/re-tag a durable signed payload or backfill history.
           try {
             assertAttributedCalldata(
@@ -101,7 +163,8 @@ export async function tick(store: Store, stopAfterJournal = false) {
         }
         if (o.state === "PREPARED")
           store.transition(o.id, "PREPARED", "SUBMITTED");
-        return;
+        if (writesEnabled) return;
+        continue;
       }
       if (o.state === "PREPARED")
         store.transition(o.id, "PREPARED", "SUBMITTED");
@@ -118,8 +181,13 @@ export async function tick(store: Store, stopAfterJournal = false) {
               "UPDATE obligations SET reason='CHAIN_RECEIPT_INCONSISTENT' WHERE id=?",
             )
             .run(o.id);
-          return;
+          continue;
         }
+        store.db
+          .prepare(
+            "UPDATE attempts SET active=0,submissionState='FAILED',receiptStatus='reverted' WHERE hash=?",
+          )
+          .run(attempt.hash);
         store.transition(o.id, "SUBMITTED", "FAILED", "CHAIN_REVERT");
         continue;
       }
@@ -127,6 +195,15 @@ export async function tick(store: Store, stopAfterJournal = false) {
         blockNumber: receipt.blockNumber,
       });
       if (canonical.hash !== receipt.blockHash) return;
+      const head = await c.publicClient.getBlockNumber({ cacheTime: 0 });
+      if (head - receipt.blockNumber + 1n < BigInt(config.finality)) {
+        store.db
+          .prepare(
+            "UPDATE obligations SET reason='AWAITING_FINALITY' WHERE id=?",
+          )
+          .run(o.id);
+        return;
+      }
       const expected = parseIntent(JSON.parse(o.intent));
       let payment: any;
       for (const log of receipt.logs) {
@@ -161,7 +238,7 @@ export async function tick(store: Store, stopAfterJournal = false) {
       if (
         payment.intentHash !==
           hashTypedData({
-            domain: domain(31337, m.vault),
+            domain: domain(m.chainId, m.vault),
             types: intentTypes,
             primaryType: "Intent",
             message: expected,
@@ -180,15 +257,15 @@ export async function tick(store: Store, stopAfterJournal = false) {
         hash: receipt.transactionHash,
       });
       store.receipt(o.id, {
-        mode: "Simulation",
-        chainId: 31337,
+        mode: m.mode,
+        chainId: m.chainId,
         transactionHash: receipt.transactionHash,
         blockNumber: receipt.blockNumber,
         blockHash: receipt.blockHash,
         vault: m.vault,
         recipient: payment.recipient,
         token: payment.token,
-        symbol: "SIMCOP",
+        symbol: m.symbol ?? "SIMCOP",
         decimals: m.decimals,
         actualSettlementAtomic: payment.amount,
         amountLukasWad: payment.amountLukasWad,
@@ -197,19 +274,86 @@ export async function tick(store: Store, stopAfterJournal = false) {
         gasUsed: receipt.gasUsed,
         effectiveGasPrice: receipt.effectiveGasPrice,
         attribution: decodedAttribution ?? "LOCAL_UNTAGGED_NOT_ELIGIBLE",
-        finality: "local-single-node",
+        finality:
+          m.chainId === 31337
+            ? "local-single-node"
+            : `${config.finality}-confirmations`,
       });
+      store.db
+        .prepare(
+          "UPDATE attempts SET receiptStatus=?,blockNumber=?,blockHash=?,gasUsed=?,effectiveGasPrice=?,actualSettlementAtomic=? WHERE hash=?",
+        )
+        .run(
+          receipt.status,
+          receipt.blockNumber.toString(),
+          receipt.blockHash,
+          receipt.gasUsed.toString(),
+          receipt.effectiveGasPrice.toString(),
+          payment.amount.toString(),
+          attempt.hash,
+        );
     }
+    if (!writesEnabled) return;
     const block = await c.publicClient.getBlock();
     const now = Number(block.timestamp);
-    for (const o of store.list()) {
+    // Recover prepared nonce reservations before newer scheduled work.
+    for (const o of store
+      .list()
+      .sort(
+        (a, b) =>
+          Number(b.state === "PREPARED") - Number(a.state === "PREPARED"),
+      )) {
+      if (
+        ["AWAITING_AUTHORIZATION", "AUTHORIZED"].includes(o.state) &&
+        parseIntent(JSON.parse(o.intent)).deadline < BigInt(now)
+      ) {
+        store.transition(o.id, o.state, "EXPIRED", "EXPIRED_AUTHORIZATION");
+        continue;
+      }
       if (!["SCHEDULED", "BLOCKED", "EVALUATING", "PREPARED"].includes(o.state))
         continue;
       const intent = parseIntent(JSON.parse(o.intent));
+      if (
+        o.state === "BLOCKED" &&
+        (o.retryAt === null || o.retryAt > Date.now())
+      )
+        continue;
       if (intent.validAfter > BigInt(now)) continue;
       // A crash during evaluation is safe to retry; PREPARED with no journal has never broadcast.
       if (o.state === "PREPARED") {
+        const staged = store.prepared(o.id);
+        if (staged) {
+          const request = {
+            ...staged.request,
+            account: c.executor.account,
+            chain: c.executor.chain,
+          };
+          const raw = await c.executor.signTransaction(request),
+            hash = keccak256(raw);
+          if (!store.lease(owner)) return;
+          store.attempt(
+            o.id,
+            hash,
+            raw,
+            request.nonce,
+            c.executor.account.address.toLowerCase(),
+            undefined,
+            staged.quoteId,
+          );
+          try {
+            await c.publicClient.sendRawTransaction({
+              serializedTransaction: raw,
+            });
+          } catch {
+            store.audit({ id: o.id, reason: "RPC_UNCERTAIN" });
+          }
+          store.transition(o.id, "PREPARED", "SUBMITTED");
+          return;
+        }
         store.transition(o.id, "PREPARED", "BLOCKED", "RECOVER_PRE_SIGN");
+        store.db
+          .prepare("UPDATE obligations SET retryAt=? WHERE id=?")
+          .run(Date.now() + 1000, o.id);
         continue;
       }
       if (o.state !== "EVALUATING")
@@ -225,9 +369,15 @@ export async function tick(store: Store, stopAfterJournal = false) {
           continue;
         }
         const snapshot: Snapshot = JSON.parse(
-          fs.readFileSync(".local/snapshot.json", "utf8"),
+          fs.readFileSync(config.snapshotPath, "utf8"),
         );
-        validateSnapshot(snapshot, now);
+        validateSnapshot(
+          snapshot,
+          now,
+          300,
+          m.chainId,
+          Number(process.env.SOURCE_CHAIN_ID || m.chainId),
+        );
         const round = (await c.publicClient.readContract({
           address: m.oracle,
           abi: a.FixtureOracle.abi,
@@ -242,7 +392,7 @@ export async function tick(store: Store, stopAfterJournal = false) {
         })) as [bigint, bigint, bigint, Hex];
         if (
           onchain[0] !== BigInt(snapshot.indexUsdWad) ||
-          onchain[2] !== BigInt(snapshot.oldestComponentUpdatedAt) ||
+          onchain[2] > BigInt(snapshot.oldestComponentUpdatedAt) ||
           onchain[3] !== snapshot.methodologyHash
         )
           throw new Error("SNAPSHOT_CHAIN_MISMATCH");
@@ -254,6 +404,103 @@ export async function tick(store: Store, stopAfterJournal = false) {
         );
         if (amount > intent.maxSettlementAtomic)
           throw new Error("MAX_SETTLEMENT_EXCEEDED");
+        const read = (functionName: string, args: unknown[] = []) =>
+          c.publicClient.readContract({
+            address: m.vault,
+            abi: a.TreasuryVault.abi,
+            functionName,
+            args,
+          });
+        const [
+          tokenPolicy,
+          allowed,
+          paused,
+          epoch,
+          age,
+          paid,
+          canceled,
+          spent,
+          funds,
+          gasBalance,
+        ] = await Promise.all([
+          read("tokens", [intent.settlementToken]),
+          read("recipients", [intent.recipient]),
+          read("paused"),
+          read("policyEpoch"),
+          read("maximumOracleAge"),
+          read("isPaid", [o.id]),
+          read("canceled", [o.id]),
+          read("dailySpent", [
+            intent.settlementToken,
+            BigInt(Math.floor(now / 86400)),
+          ]),
+          c.publicClient.readContract({
+            address: intent.settlementToken,
+            abi: a.SimulationToken.abi,
+            functionName: "balanceOf",
+            args: [m.vault],
+          }),
+          c.publicClient.getBalance({ address: c.executor.account.address }),
+        ]);
+        const t = tokenPolicy as [number, boolean, bigint, bigint];
+        const p: Policy = {
+          chainId: m.chainId,
+          vault: m.vault,
+          owner: m.owner,
+          executor: m.executor,
+          policyEpoch: String(epoch),
+          paused: Boolean(paused),
+          allowedTokens: t[1] ? [intent.settlementToken] : [],
+          allowedRecipients: allowed ? [intent.recipient] : [],
+          perTxCap: t[2].toString(),
+          dailyCap: t[3].toString(),
+          maximumOracleAgeSeconds: Number(age),
+          maximumQuoteAgeSeconds: 300,
+          maximumGasCostNativeAtomic: config.gasCap.toString(),
+          maximumRetries: 12,
+          validUntil: Number(intent.deadline),
+        };
+        const decision = evaluatePolicy({
+          intent,
+          policy: p,
+          snapshot,
+          now,
+          tokenPriceWad: onchain[1],
+          decimals: t[0],
+          balance: funds as bigint,
+          dailySpent: spent as bigint,
+          reserved: 0n,
+          paid: Boolean(paid),
+          canceled: Boolean(canceled),
+          gasBalance,
+          authority: "EXECUTE_AUTHORIZED",
+        });
+        store.audit({ id: o.id, event: "POLICY_EVALUATION", ...decision });
+        if (decision.decision !== "ALLOW") throw new Error(decision.reasons[0]);
+        store.reserve(
+          o.id,
+          intent.settlementToken,
+          Math.floor(now / 86400),
+          amount,
+          t[3],
+          spent as bigint,
+        );
+        const quoteId = store.recordQuote(
+          o.id,
+          {
+            amountAtomic: amount,
+            tokenPriceUsdWad: onchain[1],
+            round,
+            rounding: "ceiling-single-rational",
+            createdAt: now,
+            expiresAt: Math.min(
+              now + 300,
+              snapshot.oldestComponentUpdatedAt + 300,
+            ),
+            snapshotId: snapshot.snapshotId,
+          },
+          snapshot,
+        );
         await c.publicClient.simulateContract({
           address: m.vault,
           abi: a.TreasuryVault.abi,
@@ -285,14 +532,40 @@ export async function tick(store: Store, stopAfterJournal = false) {
         if (
           (request.gas ?? 0n) *
             (request.maxFeePerGas ?? request.gasPrice ?? 0n) >
-          10n ** 16n
+          config.gasCap
         )
           throw new Error("GAS_CAP");
         if (!store.lease(owner)) throw new Error("LEASE_LOST");
-        store.transition(o.id, "EVALUATING", "PREPARED");
+        const durableRequest: Record<string, unknown> = {};
+        for (const key of [
+          "chainId",
+          "nonce",
+          "to",
+          "data",
+          "value",
+          "gas",
+          "gasPrice",
+          "maxFeePerGas",
+          "maxPriorityFeePerGas",
+          "type",
+          "accessList",
+        ])
+          if ((request as any)[key] !== undefined)
+            durableRequest[key] = (request as any)[key];
+        store.stagePrepared(o.id, durableRequest, quoteId);
+        if (stopBeforeSign) return;
         const raw = await c.executor.signTransaction(request);
         const hash = keccak256(raw);
-        store.attempt(o.id, hash, raw, request.nonce!);
+        if (!store.lease(owner)) throw new Error("LEASE_LOST");
+        store.attempt(
+          o.id,
+          hash,
+          raw,
+          request.nonce!,
+          c.executor.account.address.toLowerCase(),
+          undefined,
+          quoteId,
+        );
         if (stopAfterJournal) return;
         try {
           await c.publicClient.sendRawTransaction({
@@ -310,16 +583,24 @@ export async function tick(store: Store, stopAfterJournal = false) {
       } catch (e) {
         const current = store.get(o.id)!;
         if (current.state === "EVALUATING")
-          store.transition(
+          store.retry(
             o.id,
-            "EVALUATING",
-            "BLOCKED",
             [
               "PRICE_STALE",
               "MAX_SETTLEMENT_EXCEEDED",
               "SNAPSHOT_CHAIN_MISMATCH",
               "GAS_CAP",
               "LEASE_LOST",
+              "POLICY_EPOCH_CHANGED",
+              "PAUSED",
+              "TOKEN_NOT_ALLOWED",
+              "RECIPIENT_NOT_ALLOWED",
+              "PER_TX_CAP_EXCEEDED",
+              "DAILY_CAP_EXCEEDED",
+              "INSUFFICIENT_BALANCE",
+              "INSUFFICIENT_GAS",
+              "CANCELED_ONCHAIN",
+              "DUPLICATE_PAYMENT",
             ].find((code) => (e as Error).message.includes(code)) ??
               "CONTRACT_POLICY_OR_RPC",
           );

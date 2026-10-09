@@ -14,17 +14,28 @@
     "build": "tsx scripts/compile.ts && next build apps/web",
     "typecheck": "tsc --noEmit",
     "lint": "prettier --check . && tsc --noEmit",
-    "test": "vitest run tests/domain.test.ts tests/storage.test.ts tests/attribution.test.ts",
-    "test:contracts": "vitest run tests/integration.test.ts",
+    "test": "vitest run tests/domain.test.ts tests/storage.test.ts tests/attribution.test.ts tests/policy.test.ts tests/signer.test.ts tests/parser.test.ts tests/config.test.ts tests/identity.test.ts",
+    "test:contracts": "tsx scripts/foundry.ts",
     "test:integration": "vitest run tests/integration.test.ts",
     "test:e2e": "playwright test",
     "config:validate": "tsx scripts/ops.ts validate",
-    "deploy:sepolia": "tsx scripts/ops.ts sepolia",
-    "deploy:mainnet": "tsx scripts/ops.ts mainnet",
-    "identity:prepare": "tsx scripts/ops.ts identity",
+    "deploy:sepolia": "tsx scripts/sepolia.ts deploy",
+    "deploy:mainnet": "tsx scripts/mainnet.ts",
+    "identity:prepare": "tsx scripts/identity.ts prepare",
     "attribution:verify": "tsx scripts/ops.ts attribution",
-    "pilot:check": "tsx scripts/ops.ts pilot",
-    "evidence:export": "tsx scripts/ops.ts evidence"
+    "pilot:check": "tsx scripts/readiness.ts",
+    "evidence:export": "tsx scripts/ops.ts evidence",
+    "dev:api": "tsx scripts/api.ts",
+    "dev:worker": "tsx scripts/worker.ts",
+    "demo:sepolia": "tsx scripts/sepolia.ts demo",
+    "test:foundry": "tsx scripts/foundry.ts",
+    "identity:verify": "tsx scripts/identity.ts verify",
+    "snapshot:sync": "tsx scripts/snapshot.ts",
+    "oracle:sync": "tsx scripts/oracle.ts",
+    "test:sepolia-path": "vitest run tests/sepolia-path.test.ts",
+    "demo:capture": "tsx scripts/capture-demo.ts",
+    "signer:setup": "tsx scripts/signer-setup.ts",
+    "signer:start": "tsx scripts/signer.ts"
   },
   "dependencies": {
     "@celo/attribution-tags": "0.5.0",
@@ -40,14 +51,15 @@
     "zod": "4.1.12"
   },
   "devDependencies": {
+    "@foundry-rs/forge": "1.7.1",
     "@playwright/test": "1.56.1",
     "@types/node": "24.10.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "fast-check": "4.3.0",
+    "prettier": "3.6.2",
     "tsx": "4.20.6",
     "typescript": "5.9.3",
-    "vitest": "3.2.4",
-    "prettier": "3.6.2"
+    "vitest": "3.2.4"
   }
 }

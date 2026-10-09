@@ -103,6 +103,30 @@ it("journals before broadcast and recovers exactly once after signer restart", a
   await tick(store);
   expect(await balance(manifest().recipient)).toBe(after);
 }, 30000);
+it("recovers the exact prepared request after a crash before raw signing", async () => {
+  const before = await balance(manifest().recipient);
+  const { id } = await newIntent("recover-pre-sign");
+  await tick(store, false, true);
+  expect(store.get(id)?.state).toBe("PREPARED");
+  expect(store.attempts().some((a) => a.obligation === id)).toBe(false);
+  const prepared = store.prepared(id)!;
+  store.close();
+  store = new Store();
+  await publishFixture();
+  await tick(store);
+  await tick(store);
+  expect(store.get(id)?.state).toBe("RECONCILED");
+  const attempt = store.attempts().find((a) => a.obligation === id)!;
+  const tx = await clients().publicClient.getTransaction({
+    hash: attempt.hash as Hex,
+  });
+  expect(tx.nonce).toBe(prepared.request.nonce);
+  expect(tx.input).toBe(prepared.request.data);
+  const settled = JSON.parse(store.get(id)!.receipt!).actualSettlementAtomic;
+  expect((await balance(manifest().recipient)) - before).toBe(BigInt(settled));
+  await tick(store);
+  expect((await balance(manifest().recipient)) - before).toBe(BigInt(settled));
+}, 30000);
 it("blocks cap excess visibly without a transfer", async () => {
   const id = await seed(store, "too-expensive", 1n);
   const before = await balance(manifest().recipient);
@@ -206,6 +230,7 @@ it("owner authentication is one-use; unauthorized and idempotency-conflicting wr
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "idempotency-key": "test-auth",
         ...(cookie ? { cookie } : {}),
         ...(key ? { "idempotency-key": key } : {}),
       },
@@ -232,7 +257,7 @@ it("owner authentication is one-use; unauthorized and idempotency-conflicting wr
     deadline: new Date(Date.now() + 3600000).toISOString(),
   };
   expect((await req("/v1/obligations", body, undefined, "unauth")).status).toBe(
-    400,
+    401,
   );
   expect((await req("/v1/obligations", body, cookie, "api-test")).status).toBe(
     201,
@@ -246,7 +271,7 @@ it("owner authentication is one-use; unauthorized and idempotency-conflicting wr
         "api-test",
       )
     ).status,
-  ).toBe(400);
+  ).toBe(409);
   expect((await api.request("/ready")).status).toBe(200);
 });
 
@@ -477,3 +502,190 @@ it("does not rebroadcast a known pending transaction while mining is delayed", a
     });
   }
 }, 30000);
+
+it("owner action preparation grants no authority; only a matching owner transaction becomes chain-effective", async () => {
+  const { prepareOwnerAction, verifyOwnerAction } = await import(
+      "../packages/core/owner-actions.js"
+    ),
+    c = clients(),
+    m = manifest();
+  const p = prepareOwnerAction(store, m.owner, "pause", []);
+  expect(
+    await c.publicClient.readContract({
+      address: m.vault,
+      abi: artifacts().TreasuryVault.abi,
+      functionName: "paused",
+      args: [],
+    }),
+  ).toBe(false);
+  const wrong = await c.owner.sendTransaction({ to: c.recipient, value: 1n });
+  await c.publicClient.waitForTransactionReceipt({ hash: wrong });
+  await expect(verifyOwnerAction(store, p.id, m.owner, wrong)).rejects.toThrow(
+    "OWNER_TRANSACTION_MISMATCH",
+  );
+  const hash = await c.owner.sendTransaction({ to: m.vault, data: p.data });
+  await c.publicClient.waitForTransactionReceipt({ hash });
+  expect((await verifyOwnerAction(store, p.id, m.owner, hash)).status).toBe(
+    "CHAIN_EFFECTIVE",
+  );
+  const resume = prepareOwnerAction(store, m.owner, "unpause", []),
+    h = await c.owner.sendTransaction({ to: m.vault, data: resume.data });
+  await c.publicClient.waitForTransactionReceipt({ hash: h });
+  await verifyOwnerAction(store, resume.id, m.owner, h);
+});
+
+it("fee replacement preserves nonce and exact business calldata, journals both attempts and settles once", async () => {
+  const { parseTransaction } = await import("viem");
+  await publishFixture();
+  const before = await balance(manifest().recipient),
+    { id } = await newIntent("replacement");
+  await tick(store, true);
+  const original = store.attempts().find((a) => a.obligation === id)!;
+  await server.provider.request({ method: "miner_stop", params: [] });
+  try {
+    await clients().publicClient.sendRawTransaction({
+      serializedTransaction: original.raw as Hex,
+    });
+    store.transition(id, "PREPARED", "SUBMITTED");
+    process.env.PENDING_REPLACEMENT_MS = "0";
+    await tick(store);
+  } finally {
+    delete process.env.PENDING_REPLACEMENT_MS;
+    await server.provider.request({ method: "miner_start", params: [1] });
+  }
+  const attempts = store.attempts().filter((a) => a.obligation === id);
+  expect(attempts).toHaveLength(2);
+  expect(attempts[1].nonce).toBe(attempts[0].nonce);
+  expect(parseTransaction(attempts[1].raw as Hex).data).toBe(
+    parseTransaction(attempts[0].raw as Hex).data,
+  );
+  for (let n = 0; n < 8 && store.get(id)?.state !== "RECONCILED"; n++) {
+    await tick(store);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(store.get(id)?.state).toBe("RECONCILED");
+  expect(await balance(manifest().recipient)).toBe(before + 38075000000n);
+});
+
+it("protected signer enforces authentication, role, destination and one business intent per nonce", async () => {
+  const { createSignerService } = await import("../apps/signer/service.js"),
+    { mnemonicToAccount } = await import("viem/accounts"),
+    { encodeFunctionData, toHex } = await import("viem"),
+    { prepareAttributedTransaction } = await import(
+      "../packages/core/attribution.js"
+    ),
+    { resolveAttributionCode } = await import("../packages/core/hackathon.js"),
+    { stringify } = await import("../packages/core/domain.js");
+  const previous = { ...process.env },
+    keyfile = ".local/test-signer-key",
+    authfile = ".local/test-signer-auth",
+    journalfile = ".local/test-signer-journal";
+  const account = mnemonicToAccount(localMnemonic, { addressIndex: 1 });
+  fs.writeFileSync(keyfile, toHex(account.getHdKey().privateKey!), {
+    mode: 0o600,
+  });
+  fs.writeFileSync(authfile, "test-token-".repeat(6), { mode: 0o600 });
+  fs.writeFileSync(journalfile, "33".repeat(32), { mode: 0o600 });
+  Object.assign(process.env, {
+    SIGNER_ROLE: "executor",
+    SIGNER_PRIVATE_KEY_FILE: keyfile,
+    SIGNER_AUTH_TOKEN_FILE: authfile,
+    JOURNAL_KEY_FILE: journalfile,
+    MAXIMUM_GAS_COST_NATIVE_ATOMIC: "10000000000000000",
+    SIGNER_DATABASE_PATH: ".local/test-signer.sqlite",
+  });
+  const service = createSignerService();
+  try {
+    expect(() => service.authenticate("Bearer wrong")).toThrow(
+      "SIGNER_AUTH_REQUIRED",
+    );
+    service.authenticate("Bearer " + "test-token-".repeat(6));
+    await expect(
+      service.sign({
+        role: "owner",
+        address: account.address,
+        method: "signTransaction",
+        payload: {},
+      }),
+    ).rejects.toThrow("SIGNER_ROLE_FORBIDDEN");
+    await publishFixture();
+    const { i, signature } = await newIntent("signer-scoped"),
+      m = manifest(),
+      c = clients(),
+      round = await c.publicClient.readContract({
+        address: m.oracle,
+        abi: artifacts().FixtureOracle.abi,
+        functionName: "latest",
+        args: [],
+      });
+    const data = prepareAttributedTransaction(
+      encodeFunctionData({
+        abi: artifacts().TreasuryVault.abi,
+        functionName: "executePayment",
+        args: [i, signature, round],
+      }),
+      resolveAttributionCode(),
+    );
+    const request = await c.executor.prepareTransactionRequest({
+        to: m.vault,
+        data,
+      }),
+      payload = JSON.parse(
+        stringify({ ...request, account: undefined, chain: undefined }),
+      );
+    const result = await service.sign({
+      role: "executor",
+      address: account.address,
+      method: "signTransaction",
+      payload,
+    });
+    expect(!!result.rawTransaction).toBe(true);
+    const repeat = await service.sign({
+      role: "executor",
+      address: account.address,
+      method: "signTransaction",
+      payload: JSON.parse(
+        stringify({ ...request, account: undefined, chain: undefined }),
+      ),
+    });
+    expect(repeat.rawTransaction === result.rawTransaction).toBe(true);
+    const other = await newIntent("signer-other-business"),
+      otherData = prepareAttributedTransaction(
+        encodeFunctionData({
+          abi: artifacts().TreasuryVault.abi,
+          functionName: "executePayment",
+          args: [other.i, other.signature, round],
+        }),
+        resolveAttributionCode(),
+      );
+    await expect(
+      service.sign({
+        role: "executor",
+        address: account.address,
+        method: "signTransaction",
+        payload: { ...payload, data: otherData },
+      }),
+    ).rejects.toThrow("SIGNER_NONCE_CONFLICT");
+    const bad = prepareAttributedTransaction(
+      encodeFunctionData({
+        abi: artifacts().TreasuryVault.abi,
+        functionName: "withdraw",
+        args: [m.token, m.owner, 1n],
+      }),
+      resolveAttributionCode(),
+    );
+    await expect(
+      service.sign({
+        role: "executor",
+        address: account.address,
+        method: "signTransaction",
+        payload: { ...payload, data: bad },
+      }),
+    ).rejects.toThrow("EXECUTOR_SCOPE");
+  } finally {
+    service.close();
+    for (const key of Object.keys(process.env))
+      if (!(key in previous)) delete process.env[key];
+    Object.assign(process.env, previous);
+  }
+});

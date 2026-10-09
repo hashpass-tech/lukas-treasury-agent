@@ -1,11 +1,9 @@
-# Reproducible walkthrough
+# Demo and reproducible walkthrough
 
-1. Install frozen dependencies; start `pnpm dev:local`.
-2. Show Simulation badge, funded onchain treasury and synthetic reference index.
-3. Run `pnpm demo:run`: explain a 100 LUKAS bounded signed obligation and a one-atomic-unit over-cap example.
-4. Observe settled receipt with actual local transaction hash, block, token, recipient, amount and immutable oracle round. The blocked obligation is visibly unpaid.
-5. Stop/restart the stack; rerun demo and show recipient balance is unchanged for the same stable obligation ID.
-6. Browser flow: connect local test owner wallet, enter amount/cap, review all signed terms, sign, wait 15 seconds. No new human action is needed at execution time.
-7. Explain synthetic prices, local-only identities, missing ERC-8004 registration, untagged local transactions and separate protocol pilot gates.
+Start `pnpm dev:local`, then `pnpm demo:run`. The dashboard shows **Simulation**, chain **31337**, actual mock-token balances and synthetic LUKAS basket data. The CLI demo signs 100 LUKAS within a cap, settles 38,075 SIMCOP and leaves the one-atomic-unit cap example unpaid. Stable IDs prevent duplicate settlement after restart.
 
-Automated integration tests restart the signer after journal persistence and reconcile without duplicate transfers. No demo video or external pilot evidence has yet been produced.
+In the browser, connect the public local test owner, enter amount/cap/recipient/due/expiry, review exact terms and sign. Wait for independent due execution and expand the chain-backed receipt. Then create an over-cap obligation and observe its reason/unpaid state. Show owner pause/resume, funding/withdrawal and recipient/policy preparation; each owner transaction is reviewed and verified separately.
+
+The committed [local simulation video](demo/local-simulation.webm) uses an automated **public local test wallet**, visibly labeled throughout. It shows a newly reviewed/signed obligation, actual local settlement and an unpaid cap violation. [Review](demo/review.png), [settlement](demo/settled.png) and [blocked](demo/blocked.png) screenshots provide static artifacts. `pnpm demo:capture` regenerates these against the running fresh local stack with current fixture prices. They are development evidence, not mainnet activity or independent users.
+
+Recovery/failure demonstrations are executed in integration tests: crash before raw signing, crash after journaling, accepted-but-unrecorded transaction, delayed mining without blind resends, same-nonce fee replacement and canonical reorg. The HTTPS emulator exercises full remote deployment/funding/scheduling/payment/restart. Canonical identity tooling uses a clearly labeled test registry. Follow [Sepolia](sepolia.md) to perform the actual funded testnet flow once remote signing is provisioned; preserve actual public receipts separately.
