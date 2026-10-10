@@ -2,6 +2,16 @@
 import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import packageJson from "../../../package.json";
+import {
+  formatDate,
+  languageOptions,
+  translations,
+  translatedIdentity,
+  translatedMode,
+  translatedState,
+  translatedTrustMode,
+  type Language,
+} from "./i18n";
 import { staticDemoConfig, staticDemoData } from "./static-demo";
 import {
   BrandMark,
@@ -37,16 +47,30 @@ export default function Page() {
     [oracleAge, setOracleAge] = useState("300"),
     [nextExecutor, setNextExecutor] = useState(""),
     [draftText, setDraftText] = useState(""),
-    [language, setLanguage] = useState<"en" | "es">("en"),
+    [language, setLanguage] = useState<Language>("en"),
     [error, setError] = useState(""),
     [wallet, setWallet] = useState(""),
     [amount, setAmount] = useState("100"),
     [cap, setCap] = useState("50000"),
     [draft, setDraft] = useState<any>(),
     [busy, setBusy] = useState(false);
+  const t = translations[language];
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("lukas-language");
+    if (saved === "en" || saved === "es" || saved === "ar") {
+      setLanguage(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+    window.localStorage.setItem("lukas-language", language);
+  }, [language]);
+
   async function request(path: string, body?: unknown, key?: string) {
-    if (STATIC_DEMO)
-      throw new Error("This GitHub Pages build is a read-only static demo.");
+    if (STATIC_DEMO) throw new Error(t.errors.staticDemo);
     const r = await fetch("/api" + path, {
       method: body ? "POST" : "GET",
       headers: body
@@ -58,7 +82,7 @@ export default function Page() {
       body: body ? JSON.stringify(body) : undefined,
     });
     const result = await r.json();
-    if (!r.ok) throw new Error(result.error ?? "Request failed");
+    if (!r.ok) throw new Error(result.error ?? t.errors.requestFailed);
     return result;
   }
   useEffect(() => {
@@ -89,7 +113,7 @@ export default function Page() {
     const e = (window as any).ethereum;
     if (!e)
       throw new Error(
-        `Install an EVM wallet and connect to chain ${publicConfig?.chainId ?? "shown in the dashboard"}.`,
+        t.errors.wallet(publicConfig?.chainId ?? "shown in the dashboard"),
       );
     return e;
   };
@@ -97,7 +121,7 @@ export default function Page() {
     const e = ethereum();
     const chain = await e.request({ method: "eth_chainId" });
     if (Number(BigInt(chain)) !== publicConfig?.chainId)
-      throw new Error(`Switch your wallet to chain ${publicConfig?.chainId}`);
+      throw new Error(t.errors.switchChain(publicConfig?.chainId ?? "?"));
     const accounts = await e.request({ method: "eth_requestAccounts" });
     const challenge = await request("/auth/challenge", { wallet: accounts[0] });
     const signature = await e.request({
@@ -130,10 +154,10 @@ export default function Page() {
       Number(BigInt(await e.request({ method: "eth_chainId" }))) !==
       data.config.chainId
     )
-      throw new Error(`Switch to chain ${data.config.chainId} before signing`);
+      throw new Error(t.errors.switchBeforeSigning(data.config.chainId));
     const accounts = await e.request({ method: "eth_accounts" });
     if (accounts[0]?.toLowerCase() !== wallet.toLowerCase())
-      throw new Error("Owner wallet changed; reconnect before signing");
+      throw new Error(t.errors.walletChanged);
     const typed = {
       domain: draft.domain,
       primaryType: draft.primaryType,
@@ -159,26 +183,6 @@ export default function Page() {
     );
     setDraft(null);
   }
-  const strings = {
-    en: {
-      connect: "Connect owner wallet",
-      schedule: "Schedule a supplier payment",
-      pause: "Pause treasury",
-      resume: "Resume treasury",
-      withdraw: "Prepare withdrawal",
-      readiness: "Operator readiness",
-      balance: "FUNDED TREASURY",
-    },
-    es: {
-      connect: "Conectar billetera del propietario",
-      schedule: "Programar pago a proveedor",
-      pause: "Pausar tesorería",
-      resume: "Reanudar tesorería",
-      withdraw: "Preparar retiro",
-      readiness: "Estado del operador",
-      balance: "SALDO DE TESORERÍA",
-    },
-  }[language];
   async function prepareControl(action: string, args: unknown[]) {
     setOwnerAction(
       await request(`/v1/treasuries/${data.config.vault}/policy/prepare`, {
@@ -193,7 +197,7 @@ export default function Page() {
       Number(BigInt(await e.request({ method: "eth_chainId" }))) !==
       ownerAction.chainId
     )
-      throw new Error("CHAIN_MISMATCH");
+      throw new Error(t.errors.chainMismatch);
     const hash =
       ownerAction.transactionHash ??
       (await e.request({
@@ -222,87 +226,93 @@ export default function Page() {
       }
       await new Promise((r) => setTimeout(r, 1000));
     }
-    throw new Error(
-      `Transaction pending: ${hash}; verify the chain result before retrying.`,
-    );
+    throw new Error(t.errors.pending(hash));
   }
   return (
     <main>
       <header className="topbar">
-        <BrandMark />
-        <nav className="topbar__nav" aria-label="Primary navigation">
+        <BrandMark homeLabel={t.common.brandHome} />
+        <nav className="topbar__nav" aria-label={t.nav.primary}>
           <a className="topbar__link topbar__link--active" href="#overview">
-            Overview
+            {t.nav.overview}
           </a>
           <a className="topbar__link" href="#obligations">
-            Obligations
+            {t.nav.obligations}
           </a>
           <a className="topbar__link" href="#controls">
-            Controls
+            {t.nav.controls}
           </a>
         </nav>
         <div className="topbar__actions">
           <StatusPill tone={STATIC_DEMO ? "warning" : "success"} icon="pulse">
-            {publicConfig?.mode ?? "Connecting"} · CHAIN{" "}
-            {publicConfig?.chainId ?? "…"}
+            {translatedMode(publicConfig?.mode, language)} ·{" "}
+            {t.common.chain.toUpperCase()} {publicConfig?.chainId ?? "…"}
           </StatusPill>
           <span className="chain-chip">
-            <Icon name="globe" size={14} /> Chain {publicConfig?.chainId ?? "…"}
+            <Icon name="globe" size={14} /> {t.common.chain}{" "}
+            {publicConfig?.chainId ?? "…"}
           </span>
-          <button
-            className="language-button"
-            onClick={() => setLanguage(language === "en" ? "es" : "en")}
-            aria-label="Change language"
-          >
-            {language === "en" ? "Español" : "English"}
-          </button>
+          <label className="language-picker">
+            <span className="sr-only">{t.common.language}</span>
+            <select
+              className="language-button"
+              value={language}
+              aria-label={t.common.language}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+            >
+              {languageOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.nativeLabel}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </header>
       <section className="hero" id="overview">
         <div className="hero__copy">
           <h1>
-            Keep every
+            {t.hero.titleLine1}
             <br />
-            commitment visible.
+            {t.hero.titleLine2}
           </h1>
-          <p className="hero__lede">
-            Schedule obligations in LUKAS. Settle in an allowlisted
-            local-currency token, within terms you sign.
-          </p>
+          <p className="hero__lede">{t.hero.lede}</p>
           <div className="notice">
             <span className="notice__mark">
               <Icon name={STATIC_DEMO ? "receipt" : "shield"} size={15} />
             </span>
             <span>
               {STATIC_DEMO
-                ? "Static demo · synthetic values · wallet actions disabled"
+                ? t.hero.staticNotice
                 : publicConfig?.chainId === 42220
-                  ? "Celo mainnet · reviewed assets and oracle policy required"
+                  ? t.hero.mainnetNotice
                   : publicConfig?.chainId === 11142220
-                    ? "Celo Sepolia · synthetic test asset · no event credit"
-                    : "Local EVM · synthetic prices · SIMCOP mock token"}{" "}
-              · JACK-inspired runtime; upstream integration pending licensing.
+                    ? t.hero.sepoliaNotice
+                    : t.hero.localNotice}{" "}
+              · {t.hero.runtimeNotice}
             </span>
           </div>
         </div>
-        <aside className="hero__rail" aria-label="Treasury status">
+        <aside className="hero__rail" aria-label={t.hero.statusLabel}>
           <div className="hero__rail-head">
-            <span>OPERATING STATUS</span>
-            <StatusPill tone="success">{data ? "Ready" : "Loading"}</StatusPill>
+            <span>{t.hero.statusLabel}</span>
+            <StatusPill tone="success">
+              {data ? t.common.ready : t.common.loading}
+            </StatusPill>
           </div>
           <div className="hero__rail-value">{data ? "01" : "—"}</div>
-          <p>obligation in the operator queue</p>
+          <p>{t.hero.queueCount}</p>
           <div className="hero__rail-divider" />
           <div className="hero__rail-row">
-            <span>Authorization</span>
+            <span>{t.hero.authorization}</span>
             <strong>
-              <Icon name="lock" size={14} /> Bounded
+              <Icon name="lock" size={14} /> {t.common.bounded}
             </strong>
           </div>
           <div className="hero__rail-row">
-            <span>Settlement rail</span>
+            <span>{t.hero.settlementRail}</span>
             <strong>
-              <Icon name="globe" size={14} /> Local token
+              <Icon name="globe" size={14} /> {t.common.localToken}
             </strong>
           </div>
         </aside>
@@ -314,16 +324,16 @@ export default function Page() {
       )}
       {!data ? (
         <div>
-          <p>Connect to load your treasury.</p>
+          <p>{t.actions.connect}</p>
           <button disabled={!publicConfig || busy} onClick={() => act(connect)}>
-            {strings.connect}
+            {t.actions.connect}
           </button>
         </div>
       ) : (
         <>
-          <section className="stats" aria-label="Treasury metrics">
+          <section className="stats" aria-label={t.metrics.balance}>
             <MetricCard
-              label={strings.balance}
+              label={t.metrics.balance}
               value={
                 <>
                   {formatUnits(
@@ -333,19 +343,19 @@ export default function Page() {
                   <small>{data.config.symbol ?? "SIMCOP"}</small>
                 </>
               }
-              note="Read directly from the configured token contract"
+              note={t.metrics.balanceNote}
               tone="success"
               icon="wallet"
             />
             <MetricCard
-              label="LUKAS REFERENCE VALUE"
+              label={t.metrics.reference}
               value={`$${formatUnits(BigInt(data.snapshot.indexUsdWad), 18)}`}
-              note={`${data.snapshot.trustMode} basket · USD per reference unit`}
+              note={`${translatedTrustMode(data.snapshot.trustMode, language)} ${t.metrics.referenceNote}`}
               tone="warning"
               icon="pulse"
             />
             <MetricCard
-              label="SUPPLIER RECEIVED"
+              label={t.metrics.received}
               value={
                 <>
                   {formatUnits(
@@ -355,17 +365,13 @@ export default function Page() {
                   <small>{data.config.symbol ?? "SIMCOP"}</small>
                 </>
               }
-              note="Balance observed on the configured chain"
+              note={t.metrics.receivedNote}
               icon="receipt"
             />
             <MetricCard
-              label="POLICY EPOCH"
+              label={t.metrics.epoch}
               value={`0${data.policy.policyEpoch}`}
-              note={
-                data.policy.paused
-                  ? "Treasury is paused"
-                  : "Settlement policy active"
-              }
+              note={data.policy.paused ? t.metrics.paused : t.metrics.active}
               tone={data.policy.paused ? "warning" : "success"}
               icon="shield"
             />
@@ -373,8 +379,8 @@ export default function Page() {
           <section className="workspace">
             <article className="compose">
               <SectionHeading
-                title={strings.schedule}
-                description="One recipient. One token. One maximum. A signature authorizes only these terms."
+                title={t.compose.schedule}
+                description={t.compose.scheduleDescription}
                 icon="shield"
               />
               <Button
@@ -384,20 +390,25 @@ export default function Page() {
                 icon={wallet ? "check" : "wallet"}
               >
                 {STATIC_DEMO
-                  ? "Read-only static demo"
+                  ? t.actions.staticDemo
                   : wallet
-                    ? "Wallet connected"
-                    : strings.connect}
+                    ? t.actions.connected
+                    : t.actions.connect}
               </Button>
               <details>
-                <summary>Optional text draft · deterministic parser</summary>
+                <summary>{t.compose.draftSummary}</summary>
                 <label>
-                  Explicit payment terms
+                  {t.compose.explicitTerms}
                   <textarea
                     value={draftText}
                     onChange={(e) => setDraftText(e.target.value)}
                     readOnly={STATIC_DEMO}
-                    placeholder={`pay 1 LUKAS to ${data.config.recipient} max 500 ${data.config.symbol ?? "SIMCOP"} due 2026-10-30T10:00:00-05:00 until 2026-10-30T11:00:00-05:00`}
+                    placeholder={t.compose.draftExample
+                      .replace("0x…", data.config.recipient)
+                      .replace(
+                        "500 SIMCOP",
+                        `500 ${data.config.symbol ?? "SIMCOP"}`,
+                      )}
                   />
                 </label>
                 <button
@@ -421,11 +432,11 @@ export default function Page() {
                     })
                   }
                 >
-                  Parse into review form
+                  {t.actions.parse}
                 </button>
-                <p>Produces a draft only. It cannot sign or send money.</p>
+                <p>{t.compose.draftHelp}</p>
               </details>
-              <Field label="LUKAS denomination" hint="18 decimals">
+              <Field label={t.compose.lukas} hint={t.common.decimals}>
                 <TextInput
                   value={amount}
                   readOnly={STATIC_DEMO}
@@ -437,8 +448,10 @@ export default function Page() {
                 />
               </Field>
               <Field
-                label={`Maximum ${data.config.symbol ?? "SIMCOP"} settlement`}
-                hint="Signed cap"
+                label={t.compose.maxSettlementLabel(
+                  data.config.symbol ?? "SIMCOP",
+                )}
+                hint={t.common.signedCap}
               >
                 <TextInput
                   value={cap}
@@ -450,7 +463,10 @@ export default function Page() {
                   inputMode="decimal"
                 />
               </Field>
-              <Field label="Supplier wallet" hint="Allowlisted recipient">
+              <Field
+                label={t.compose.supplier}
+                hint={t.common.allowlistedRecipient}
+              >
                 <TextInput
                   value={recipient || data.config.recipient}
                   readOnly={STATIC_DEMO}
@@ -460,14 +476,14 @@ export default function Page() {
                   }}
                 />
               </Field>
-              <Field label="Settlement token" hint="Allowlisted asset">
-                <select aria-label="Settlement token" disabled={STATIC_DEMO}>
+              <Field label={t.compose.token} hint={t.common.allowlistedAsset}>
+                <select aria-label={t.compose.token} disabled={STATIC_DEMO}>
                   <option>
                     {data.config.symbol ?? "SIMCOP"} · {data.config.token}
                   </option>
                 </select>
               </Field>
-              <Field label="Due time" hint="ISO-8601 with timezone">
+              <Field label={t.compose.due} hint={t.common.isoTime}>
                 <TextInput
                   placeholder="2026-10-30T12:00:00-05:00"
                   value={dueAt}
@@ -478,7 +494,7 @@ export default function Page() {
                   }}
                 />
               </Field>
-              <Field label="Expiry" hint="Defaults to one hour">
+              <Field label={t.compose.expiry} hint={t.common.defaultsOneHour}>
                 <TextInput
                   placeholder="2026-10-30T13:00:00-05:00"
                   value={deadline}
@@ -494,57 +510,53 @@ export default function Page() {
                 onClick={() => act(prepare)}
                 icon="arrow-up-right"
               >
-                Review exact terms
+                {t.actions.reviewTerms}
               </Button>
               {draft && (
                 <div className="review" data-draft-id={draft.id}>
-                  <h3>Review before signing</h3>
+                  <h3>{t.compose.reviewTitle}</h3>
                   <DataList>
                     <DataItem
-                      label="Quote"
+                      label={t.compose.quote}
                       value={`${formatUnits(BigInt(draft.message.amountLukasWad), 18)} LUKAS → ${formatUnits(BigInt(draft.quoteAtomic), data.config.decimals)} ${data.config.symbol ?? "SIMCOP"}`}
                     />
                     <DataItem
-                      label="Signed cap"
+                      label={t.common.signedCap}
                       value={`${formatUnits(BigInt(draft.message.maxSettlementAtomic), data.config.decimals)} ${data.config.symbol ?? "SIMCOP"} · epoch ${draft.message.policyEpoch}`}
                     />
                     <DataItem
-                      label="Valid after"
-                      value={`${new Date(Number(draft.message.validAfter) * 1000).toLocaleString("en-US", { timeZone: "America/Bogota" })} (Bogotá)`}
+                      label={t.compose.validAfter}
+                      value={`${formatDate(Number(draft.message.validAfter) * 1000, language)} (Bogotá)`}
                     />
                     <DataItem
-                      label="Vault / recipient"
+                      label={t.compose.vaultRecipient}
                       value={`${draft.message.vault} / ${draft.message.recipient}`}
                       mono
                     />
                     <DataItem
-                      label="Deadline"
-                      value={`${new Date(Number(draft.message.deadline) * 1000).toLocaleString("en-US", { timeZone: "America/Bogota" })} (Bogotá)`}
+                      label={t.compose.deadline}
+                      value={`${formatDate(Number(draft.message.deadline) * 1000, language)} (Bogotá)`}
                     />
                   </DataList>
                   <p>
-                    Quote is indicative; execution uses a fresh accepted round
-                    within your signed cap. Methodology{" "}
+                    {t.compose.quoteHelp} {t.compose.methodology}{" "}
                     {draft.message.methodologyHash}.
                   </p>
                   <Button disabled={busy} onClick={() => act(sign)} icon="lock">
-                    Sign bounded obligation
+                    {t.actions.sign}
                   </Button>
                 </div>
               )}
-              <p className="hint">
-                No browser wallet? Run <code>pnpm demo:run</code> to fund and
-                sign with local-only test identities.
-              </p>
+              <p className="hint">{t.compose.walletHelp}</p>
             </article>
             <article className="queue" id="obligations">
               <SectionHeading
-                title="Obligations & receipts"
-                description="Every item carries its cap, state and chain-backed evidence."
+                title={t.queue.title}
+                description={t.queue.description}
                 icon="receipt"
               />
               {data.obligations.length === 0 ? (
-                <p>No obligations yet. Create one or run the CLI demo.</p>
+                <p>{t.queue.empty}</p>
               ) : (
                 data.obligations.map((o: any) => (
                   <div
@@ -566,7 +578,7 @@ export default function Page() {
                               : "")
                         }
                       >
-                        {o.state === "RECONCILED" ? "Settled" : o.state}
+                        {translatedState(o.state, language)}
                       </span>
                     </div>
                     <p className="mono">
@@ -594,14 +606,18 @@ export default function Page() {
                             )
                           }
                         >
-                          Prepare cancellation
+                          {t.actions.cancel}
                         </button>
                       )}
-                    {o.reason && <p className="reason">Unpaid: {o.reason}</p>}
+                    {o.reason && (
+                      <p className="reason">
+                        {t.queue.unpaidReason}: {o.reason}
+                      </p>
+                    )}
                     {o.receipt && (
                       <details>
                         <summary>
-                          Chain-backed receipt ·{" "}
+                          {t.queue.chainReceipt} ·{" "}
                           {formatUnits(
                             BigInt(o.receipt.actualSettlementAtomic),
                             o.receipt.decimals,
@@ -609,20 +625,20 @@ export default function Page() {
                           {o.receipt.symbol}
                         </summary>
                         <p className="mono">
-                          Transaction: {o.receipt.transactionHash}
+                          {t.queue.transaction}: {o.receipt.transactionHash}
                           <br />
-                          Block: {o.receipt.blockNumber}
+                          {t.queue.block}: {o.receipt.blockNumber}
                           <br />
-                          Recipient: {o.receipt.recipient}
+                          {t.queue.recipient}: {o.receipt.recipient}
                           <br />
-                          Oracle round: {o.receipt.oracleRound}
+                          {t.queue.oracleRound}: {o.receipt.oracleRound}
                         </p>
                         <p>
                           {o.receipt.chainId === 31337
-                            ? "Local transaction; no mainnet evidence, identity registration, or eligible attribution."
+                            ? t.queue.localEvidence
                             : o.receipt.chainId === 11142220
-                              ? "Celo Sepolia test receipt; no mainnet event credit."
-                              : "Celo mainnet receipt. Confirm the wallet, attribution and identity against the event registration."}
+                              ? t.queue.sepoliaEvidence
+                              : t.queue.mainnetEvidence}
                         </p>
                       </details>
                     )}
@@ -633,8 +649,8 @@ export default function Page() {
           </section>
           <section className="compose" id="controls">
             <SectionHeading
-              title="Owner controls"
-              description="Only your wallet can pause, withdraw, cancel or change policy. A prepared action becomes effective after its successful chain transaction is verified."
+              title={t.controls.title}
+              description={t.controls.description}
               icon="sliders"
             />
             <button
@@ -645,10 +661,10 @@ export default function Page() {
                 )
               }
             >
-              {data.policy.paused ? strings.resume : strings.pause}
+              {data.policy.paused ? t.actions.resume : t.actions.pause}
             </button>
             <label>
-              Funding amount
+              {t.controls.fundingAmount}
               <input
                 value={fundAmount}
                 readOnly={STATIC_DEMO}
@@ -666,10 +682,10 @@ export default function Page() {
                 )
               }
             >
-              Prepare treasury funding
+              {t.actions.fund}
             </button>
             <label>
-              Withdrawal amount
+              {t.controls.withdrawalAmount}
               <input
                 value={withdrawAmount}
                 readOnly={STATIC_DEMO}
@@ -689,17 +705,13 @@ export default function Page() {
                 )
               }
             >
-              {strings.withdraw}
+              {t.actions.withdraw}
             </button>
             <details>
-              <summary>Recipients and policy</summary>
-              <p>
-                Changing recipients, token limits, executor or source age
-                invalidates existing authorizations. Review and sign replacement
-                obligations after the change.
-              </p>
+              <summary>{t.controls.recipientsPolicy}</summary>
+              <p>{t.controls.policyWarning}</p>
               <label>
-                Recipient to configure
+                {t.controls.recipientToConfigure}
                 <input
                   value={allowedRecipient}
                   readOnly={STATIC_DEMO}
@@ -714,7 +726,7 @@ export default function Page() {
                   )
                 }
               >
-                Allow recipient
+                {t.actions.allowRecipient}
               </button>
               <button
                 disabled={!wallet || busy || !allowedRecipient}
@@ -724,10 +736,10 @@ export default function Page() {
                   )
                 }
               >
-                Remove recipient
+                {t.actions.removeRecipient}
               </button>
               <label>
-                Per-payment token limit
+                {t.controls.perPaymentLimit}
                 <input
                   value={perPaymentLimit}
                   readOnly={STATIC_DEMO}
@@ -736,7 +748,7 @@ export default function Page() {
                 />
               </label>
               <label>
-                Daily token limit
+                {t.controls.dailyLimit}
                 <input
                   value={dailyLimit}
                   readOnly={STATIC_DEMO}
@@ -761,10 +773,10 @@ export default function Page() {
                   )
                 }
               >
-                Prepare token limits
+                {t.actions.tokenLimits}
               </button>
               <label>
-                Maximum source age (seconds)
+                {t.controls.sourceAge}
                 <input
                   value={oracleAge}
                   readOnly={STATIC_DEMO}
@@ -778,10 +790,10 @@ export default function Page() {
                   act(() => prepareControl("configurePolicy", [oracleAge]))
                 }
               >
-                Prepare source freshness policy
+                {t.actions.sourcePolicy}
               </button>
               <label>
-                Replacement executor
+                {t.controls.executor}
                 <input
                   value={nextExecutor}
                   readOnly={STATIC_DEMO}
@@ -794,7 +806,7 @@ export default function Page() {
                   act(() => prepareControl("setExecutor", [nextExecutor]))
                 }
               >
-                Prepare executor rotation
+                {t.actions.executorRotation}
               </button>
             </details>
             {data.pendingOwnerActions?.map((a: any) => (
@@ -803,79 +815,82 @@ export default function Page() {
                 disabled={busy}
                 onClick={() => setOwnerAction(a)}
               >
-                Resume verification: {a.action} ·{" "}
+                {t.actions.resumeVerification}: {a.action} ·{" "}
                 {a.transactionHash.slice(0, 14)}…
               </button>
             ))}
             {ownerAction && (
               <div className="review">
-                <h3>Review owner transaction</h3>
+                <h3>{t.controls.reviewTitle}</h3>
                 <p>
-                  {ownerAction.action} · chain {ownerAction.chainId}
+                  {ownerAction.action} · {t.controls.chain}{" "}
+                  {ownerAction.chainId}
                 </p>
                 <p className="mono">
-                  Destination {ownerAction.to}
+                  {t.controls.destination} {ownerAction.to}
                   <br />
-                  Arguments {JSON.stringify(ownerAction.args)}
+                  {t.controls.arguments} {JSON.stringify(ownerAction.args)}
                 </p>
                 <button disabled={busy} onClick={() => act(submitControl)}>
                   {ownerAction.transactionHash
-                    ? "Verify submitted owner transaction"
-                    : "Send reviewed owner transaction"}
+                    ? t.actions.verify
+                    : t.actions.send}
                 </button>
               </div>
             )}
           </section>
           <section className="compose readiness-panel">
             <SectionHeading
-              title={strings.readiness}
-              description="Evidence that the current policy can safely execute."
+              title={t.readiness.title}
+              description={t.readiness.description}
               icon="pulse"
             />
             <p className="readiness-copy">
-              Source: {data.snapshot.trustMode} · oldest component{" "}
-              {new Date(
+              {t.common.source}:{" "}
+              {translatedTrustMode(data.snapshot.trustMode, language)} ·{" "}
+              {t.readiness.oldestComponent}{" "}
+              {formatDate(
                 data.snapshot.oldestComponentUpdatedAt * 1000,
-              ).toLocaleString()}{" "}
+                language,
+              )}{" "}
               ·{" "}
               {Date.now() / 1000 - data.snapshot.oldestComponentUpdatedAt >
               data.policy.maximumOracleAgeSeconds
-                ? "STALE — execution blocked"
-                : "fresh"}
+                ? t.readiness.stale
+                : t.readiness.fresh}
             </p>
             <p>
-              Policy epoch {data.policy.policyEpoch} · paused{" "}
-              {String(data.policy.paused)} · per-payment cap{" "}
+              {t.readiness.policyEpoch} {data.policy.policyEpoch} ·{" "}
+              {t.readiness.paused}{" "}
+              {data.policy.paused ? t.common.trueValue : t.common.falseValue} ·{" "}
+              {t.readiness.perPaymentCap}{" "}
               {formatUnits(
                 BigInt(data.policy.tokenPolicy[2]),
                 data.config.decimals,
               )}{" "}
-              · daily cap{" "}
+              · {t.readiness.dailyCap}{" "}
               {formatUnits(
                 BigInt(data.policy.tokenPolicy[3]),
                 data.config.decimals,
               )}
             </p>
             <p className="mono">
-              Agent {data.config.executor}
+              {t.readiness.agent} {data.config.executor}
               <br />
-              Attribution {data.agent.attributionCode}
+              {t.readiness.attribution} {data.agent.attributionCode}
               <br />
-              ERC-8004 identity: {data.agent.identity ?? "unregistered"}
+              {t.readiness.identity}:{" "}
+              {translatedIdentity(data.agent.identity, language) ??
+                t.readiness.unregistered}
             </p>
-            <p>
-              Local/testnet transactions do not count toward the event. Mainnet
-              requires reviewed asset/oracle provenance, identity and explicit
-              operator authorization.
-            </p>
+            <p>{t.readiness.eventNote}</p>
           </section>
           <footer>
-            Powered by JACK principles · Owner controls custody · Daily caps
-            reset at UTC midnight ·{" "}
+            {t.footer.text} ·{" "}
             {publicConfig?.mainnetWrites
-              ? "Reviewed mainnet writes enabled"
-              : "Mainnet writes disabled"}{" "}
-            · Release v{packageJson.version}
+              ? t.footer.mainnetOn
+              : t.footer.mainnetOff}{" "}
+            · {t.footer.release} v{packageJson.version}
           </footer>
         </>
       )}

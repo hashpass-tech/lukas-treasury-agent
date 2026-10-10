@@ -41,6 +41,15 @@ settled state. Motion is purposeful: the hero reveals once, the operating
 indicator breathes while live, and hover movement stays subtle. Reduced-motion
 users receive the same information without entrance or pulse effects.
 
+## Localization and direction
+
+The dashboard ships with English (`en`), Spanish (`es`) and Arabic (`ar`) in
+`apps/web/app/i18n.ts`. All operator-facing copy is read from the shared
+translation map. The language picker persists the selection locally, updates
+the document locale, and switches Arabic to right-to-left layout. Keep wallet
+addresses, hashes, chain IDs and command syntax unchanged inside translations;
+they are protocol data rather than prose.
+
 ## Handoff checklist
 
 1. Verify the first viewport at 1440px and 390px.

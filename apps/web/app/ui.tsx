@@ -99,9 +99,13 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   return <svg {...common}>{paths[name]}</svg>;
 }
 
-export function BrandMark() {
+export function BrandMark({
+  homeLabel = "LUKAS Treasury home",
+}: {
+  homeLabel?: string;
+}) {
   return (
-    <a className="brand-mark" href="./" aria-label="LUKAS Treasury home">
+    <a className="brand-mark" href="./" aria-label={homeLabel}>
       <span className="brand-mark__glyph">L</span>
       <span className="brand-mark__word">LUKAS</span>
       <span className="brand-mark__suffix">TREASURY</span>
