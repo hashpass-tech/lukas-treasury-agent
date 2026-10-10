@@ -97,13 +97,14 @@ const heading = new RegExp(
   `^## (?:${escapedVersion}|\\[${escapedVersion}\\](?:\\([^\\n]+\\))?) \\([^\\n]+\\)\\n(?:\\n)*`,
   "m",
 );
-if (!heading.test(changelog))
+const headingMatch = changelog.match(heading);
+if (!headingMatch)
   fail(`versioning did not create a changelog entry for ${version}`);
 
 const bulletLines = (commits.length > 0 ? commits : [`Release ${version}`])
   .map((message) => `- ${message.replace(/^[-*]\s*/, "")}`)
   .join("\n");
-const entry = `## ${version} (${date})\n\n### Changed\n\n${bulletLines}\n\n`;
+const entry = `${headingMatch[0].trim()}\n\n### Changed\n\n${bulletLines}\n\n`;
 fs.writeFileSync(changelogPath, changelog.replace(heading, entry));
 
 run("pnpm", [
@@ -117,6 +118,18 @@ run("pnpm", [
   "--pkg",
   "package.json",
 ]);
+const readmePath = path.join(root, "README.md");
+const readme = fs.readFileSync(readmePath, "utf8");
+const footer =
+  /Release <strong>v[^<]+<\/strong> · <a href="CHANGELOG\.md">Changelog<\/a> · Updated \d{4}-\d{2}-\d{2}/;
+if (!footer.test(readme)) fail("README.md has no release footer to update");
+fs.writeFileSync(
+  readmePath,
+  readme.replace(
+    footer,
+    `Release <strong>v${version}</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated ${date}`,
+  ),
+);
 run("pnpm", ["exec", "versioning", "check-changelog", "--version", version]);
 run("pnpm", ["release:metadata:check"]);
 
