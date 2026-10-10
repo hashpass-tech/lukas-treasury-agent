@@ -1,3 +1,15 @@
+## [0.1.2](https://github.com/hashpass-tech/lukas-treasury-agent/compare/v0.1.1...v0.1.2) (2026-10-10)
+
+### Changed
+
+- 🐛 fix: preserve release metadata during bump
+- 🐛 fix: accept linked versioning changelog headings
+- 🛠️ fix: run specs versioning from workspace root
+- 🐛 fix: resolve versioning config during release
+- 🧹 chore: refresh Pages action versions
+- 🚀 feat: publish static web demo to GitHub Pages
+- 🔧 chore: guard releases with versioning and husky
+
 # Changelog
 
 All notable changes to LUKAS Treasury are recorded here. Version numbers follow semantic versioning.

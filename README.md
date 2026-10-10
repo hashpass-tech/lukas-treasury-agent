@@ -62,23 +62,24 @@ Issue #1 is tracked in the [.specs execution plan](.specs/PLAN.md), with an inte
 
 The main web interface is published as a read-only static demo at [hashpass-tech.github.io/lukas-treasury-agent](https://hashpass-tech.github.io/lukas-treasury-agent/). The Pages workflow builds the same Next.js app with deterministic local-demo data, so no API, wallet, private key or remote chain is used. Local development keeps the API-backed dashboard and wallet controls.
 
-## 📋 Latest Changes (v0.1.1)
+## 📋 Latest Changes (v0.1.2)
 
-### Added
+### Changed
 
-- Internal commerce simulation with transport-neutral `commerce.v1` adapter ports.
-- Immutable policy, quote, reservation and booking snapshots with integer basis-point accounting.
-- Deterministic capacity, expiry, idempotency, payment, attendance and settlement behavior.
-- `.specs` task workspace managed through `@edcalderon/versioning@1.5.13`.
-- Follow-up tracking for domain/accounting work and future HashPass or allied adapters.
+- 🐛 fix: preserve release metadata during bump
+- 🐛 fix: accept linked versioning changelog headings
+- 🛠️ fix: run specs versioning from workspace root
+- 🐛 fix: resolve versioning config during release
+- 🧹 chore: refresh Pages action versions
+- 🚀 feat: publish static web demo to GitHub Pages
+- 🔧 chore: guard releases with versioning and husky
 
-### Documentation
+# Changelog
 
-- Added commerce architecture, economics and interoperability documentation.
-- Recorded the internal-first MVP boundary and remaining external validation gates.
+All notable changes to LUKAS Treasury are recorded here. Version numbers follow semantic versioning.
 
 For full version history, see [CHANGELOG.md](./CHANGELOG.md) and [GitHub releases](https://github.com/hashpass-tech/lukas-treasury-agent/releases)
 
 ---
 
-<p align="center"><sub>Release <strong>v0.1.1</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated 2026-10-10</sub></p>
+<p align="center"><sub>Release <strong>v0.1.2</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated 2026-10-10</sub></p>
