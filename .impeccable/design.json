@@ -4,20 +4,25 @@
   "mode": "operate",
   "tokens": {
     "color": {
-      "ink950": "#0b1020",
-      "ink900": "#11182a",
-      "ink800": "#18223a",
-      "ink700": "#26324d",
+      "ink950": "#080b14",
+      "ink900": "#101522",
+      "ink800": "#1b2334",
+      "ink700": "#293349",
       "paper100": "#f6f4ee",
       "paper200": "#e9e8e1",
       "textStrong": "#f7f8f5",
       "textMuted": "#a9b3c5",
-      "mint400": "#9ce4c1",
-      "mint500": "#66d19c",
+      "mint400": "#b9f279",
+      "mint500": "#83dd69",
       "amber300": "#f4c887",
-      "coral300": "#ff9c91"
+      "coral300": "#ff9c91",
+      "hotPink": "#ff5ca8"
     },
-    "radius": { "panel": "18px", "control": "10px" },
+    "radius": { "panel": "14px", "control": "8px" },
+    "type": {
+      "display": "Space Grotesk Variable",
+      "data": "DM Mono"
+    },
     "space": { "unit": "4px" }
   },
   "components": [

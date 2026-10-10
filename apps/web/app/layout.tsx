@@ -1,3 +1,5 @@
+import "@fontsource-variable/space-grotesk";
+import "@fontsource/dm-mono/400.css";
 import "./style.css";
 export const metadata = {
   title: "LUKAS Treasury · Policy-controlled settlement",

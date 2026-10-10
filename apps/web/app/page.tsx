@@ -260,7 +260,6 @@ export default function Page() {
       </header>
       <section className="hero" id="overview">
         <div className="hero__copy">
-          <p className="hero__kicker">POLICY-CONTROLLED SETTLEMENT</p>
           <h1>
             Keep every
             <br />

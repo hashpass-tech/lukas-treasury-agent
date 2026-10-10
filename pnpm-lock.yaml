@@ -11,6 +11,12 @@ importers:
       '@celo/attribution-tags':
         specifier: 0.5.0
         version: 0.5.0(typescript@5.9.3)(viem@2.38.5(bufferutil@4.0.7)(typescript@5.9.3)(utf-8-validate@6.0.3)(zod@4.1.12))(zod@4.1.12)
+      '@fontsource-variable/space-grotesk':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/dm-mono':
+        specifier: 5.3.0
+        version: 5.3.0
       '@hono/node-server':
         specifier: 1.19.9
         version: 1.19.9(hono@4.13.13)
@@ -420,6 +426,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/space-grotesk@5.3.0':
+    resolution: {integrity: sha512-2IxmvfB08i9vnGB3Ym/AXvhRE+8XOjWMXIyDum03c+tPwH0FUoMNQfGpU8NXPxjbws0Vvss3AH0Zqt4oJBBAdw==}
+
+  '@fontsource/dm-mono@5.3.0':
+    resolution: {integrity: sha512-OINjI8C1S/wpchhQxl7njZdMn4+hnDCpQ4YtvvOpKNARo+0J8O1x1IcrChxNjHOhfVv1by8C/FQoy3hXK+C1Ug==}
 
   '@foundry-rs/forge-darwin-amd64@1.7.1':
     resolution: {integrity: sha512-0P18bZyXiCJ5YJMQ+FgOE3WToqt7qBp8eyeBWFAIHX79hwN8RWtvdBWJ6ZcYH14lWZVuN8oYi8Wkth/t3jAa8g==}
@@ -1920,6 +1932,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@fontsource-variable/space-grotesk@5.3.0': {}
+
+  '@fontsource/dm-mono@5.3.0': {}
 
   '@foundry-rs/forge-darwin-amd64@1.7.1':
     optional: true

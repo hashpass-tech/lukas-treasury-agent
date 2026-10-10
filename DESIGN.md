@@ -20,11 +20,11 @@ An operator opens the dashboard to answer three questions quickly:
 ## Visual language
 
 - Midnight navy is the operating surface; warm ivory is the reading surface.
-- Mint means allowed, fresh, funded or settled. Amber means review, synthetic
-  data or a bounded warning. Coral is reserved for an error or blocked state.
-- Serif display type gives the product a recognizable editorial voice; compact
-  sans-serif UI type keeps controls precise; monospace is reserved for wallet
-  addresses, hashes and chain identifiers.
+- Lime means allowed, fresh, funded or settled. Amber means review, synthetic
+  data or a bounded warning. Hot pink marks primary actions and active
+  navigation. Coral is reserved for an error or blocked state.
+- Space Grotesk Variable gives display and UI copy a thin, technical editorial
+  voice; DM Mono is reserved for wallet addresses, hashes and chain identifiers.
 - Layout uses a 12-column editorial grid on wide screens and a single-column
   reading order on small screens.
 - Borders are quiet 1px rules. Panels use one elevation treatment: a soft
@@ -36,20 +36,21 @@ An operator opens the dashboard to answer three questions quickly:
 ## Tokens
 
 ```css
---ink-950: #0b1020;
---ink-900: #11182a;
---ink-800: #18223a;
---ink-700: #26324d;
+--ink-950: #080b14;
+--ink-900: #101522;
+--ink-800: #1b2334;
+--ink-700: #293349;
 --paper-100: #f6f4ee;
 --paper-200: #e9e8e1;
 --text-strong: #f7f8f5;
 --text-muted: #a9b3c5;
---mint-400: #9ce4c1;
---mint-500: #66d19c;
+--mint-400: #b9f279;
+--mint-500: #83dd69;
 --amber-300: #f4c887;
 --coral-300: #ff9c91;
---radius-panel: 18px;
---radius-control: 10px;
+--hot-pink: #ff5ca8;
+--radius-panel: 14px;
+--radius-control: 8px;
 --space-unit: 4px;
 ```
 

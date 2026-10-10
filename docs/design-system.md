@@ -30,12 +30,16 @@ provider-specific data. Use these shared variants:
 
 ## Layout and type
 
-Use a 4px spacing unit, 18px panel corners, 10px control corners, and a
-12-column desktop grid. Use the serif display face for a small number of
-high-value statements; use the sans UI face for labels and controls; use the
-monospace face only for addresses, hashes and chain data. Keep paragraphs at a
-comfortable reading measure and never encode critical information only through
-color.
+Use a 4px spacing unit, 14px panel corners, 8px control corners, and a
+12-column desktop grid. Use the self-hosted Space Grotesk Variable face for
+thin display and UI copy; use self-hosted DM Mono only for addresses, hashes
+and chain data. Keep paragraphs at a comfortable reading measure and never
+encode critical information only through color.
+
+Hot pink marks the primary action and active navigation. Lime marks a safe or
+settled state. Motion is purposeful: the hero reveals once, the operating
+indicator breathes while live, and hover movement stays subtle. Reduced-motion
+users receive the same information without entrance or pulse effects.
 
 ## Handoff checklist
 
