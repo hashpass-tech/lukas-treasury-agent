@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "direction": "Port Ledger",
+  "mode": "operate",
+  "tokens": {
+    "color": {
+      "ink950": "#0b1020",
+      "ink900": "#11182a",
+      "ink800": "#18223a",
+      "ink700": "#26324d",
+      "paper100": "#f6f4ee",
+      "paper200": "#e9e8e1",
+      "textStrong": "#f7f8f5",
+      "textMuted": "#a9b3c5",
+      "mint400": "#9ce4c1",
+      "mint500": "#66d19c",
+      "amber300": "#f4c887",
+      "coral300": "#ff9c91"
+    },
+    "radius": { "panel": "18px", "control": "10px" },
+    "space": { "unit": "4px" }
+  },
+  "components": [
+    "BrandMark",
+    "StatusPill",
+    "MetricCard",
+    "Panel",
+    "Field",
+    "ObligationRow",
+    "ActionButton",
+    "DataList"
+  ],
+  "responsive": {
+    "wide": ">=1080px",
+    "mid": "720px-1079px",
+    "small": "<720px"
+  }
+}

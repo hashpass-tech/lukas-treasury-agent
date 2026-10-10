@@ -2,6 +2,18 @@
 import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { staticDemoConfig, staticDemoData } from "./static-demo";
+import {
+  BrandMark,
+  Button,
+  DataItem,
+  DataList,
+  Field,
+  Icon,
+  MetricCard,
+  SectionHeading,
+  StatusPill,
+  TextInput,
+} from "./ui";
 
 const STATIC_DEMO = process.env.NEXT_PUBLIC_STATIC_DEMO === "true";
 
@@ -215,42 +227,84 @@ export default function Page() {
   }
   return (
     <main>
-      <header>
-        <a className="brand" href="./">
-          L<span>U</span>KAS <small>TREASURY</small>
-        </a>
-        <span className="badge">
-          {publicConfig?.mode ?? "Connecting"} · CHAIN{" "}
-          {publicConfig?.chainId ?? "…"}
-        </span>
-        <button
-          onClick={() => setLanguage(language === "en" ? "es" : "en")}
-          aria-label="Change language"
-        >
-          {language === "en" ? "Español" : "English"}
-        </button>
-      </header>
-      <section className="hero">
-        <p className="eyebrow">REGIONAL VALUE. LOCAL SETTLEMENT.</p>
-        <h1>
-          A treasury that
-          <br />
-          keeps its commitments.
-        </h1>
-        <p>
-          Schedule obligations in LUKAS. Settle in an allowlisted local-currency
-          token, within terms you sign.
-        </p>
-        <div className="notice">
-          {STATIC_DEMO
-            ? "GitHub Pages static demo · API and wallet actions disabled"
-            : publicConfig?.chainId === 42220
-              ? "Celo mainnet · reviewed assets and oracle policy required"
-              : publicConfig?.chainId === 11142220
-                ? "Celo Sepolia · TESTCOP synthetic test asset · no event credit"
-                : "Local EVM and synthetic prices · SIMCOP is a mock token"}{" "}
-          · JACK-inspired runtime; upstream integration pending licensing.
+      <header className="topbar">
+        <BrandMark />
+        <nav className="topbar__nav" aria-label="Primary navigation">
+          <a className="topbar__link topbar__link--active" href="#overview">
+            Overview
+          </a>
+          <a className="topbar__link" href="#obligations">
+            Obligations
+          </a>
+          <a className="topbar__link" href="#controls">
+            Controls
+          </a>
+        </nav>
+        <div className="topbar__actions">
+          <StatusPill tone={STATIC_DEMO ? "warning" : "success"} icon="pulse">
+            {publicConfig?.mode ?? "Connecting"}
+          </StatusPill>
+          <span className="chain-chip">
+            <Icon name="globe" size={14} /> Chain {publicConfig?.chainId ?? "…"}
+          </span>
+          <button
+            className="language-button"
+            onClick={() => setLanguage(language === "en" ? "es" : "en")}
+            aria-label="Change language"
+          >
+            {language === "en" ? "Español" : "English"}
+          </button>
         </div>
+      </header>
+      <section className="hero" id="overview">
+        <div className="hero__copy">
+          <p className="hero__kicker">POLICY-CONTROLLED SETTLEMENT</p>
+          <h1>
+            Keep every
+            <br />
+            commitment visible.
+          </h1>
+          <p className="hero__lede">
+            Schedule obligations in LUKAS. Settle in an allowlisted
+            local-currency token, within terms you sign.
+          </p>
+          <div className="notice">
+            <span className="notice__mark">
+              <Icon name={STATIC_DEMO ? "receipt" : "shield"} size={15} />
+            </span>
+            <span>
+              {STATIC_DEMO
+                ? "Static demo · synthetic values · wallet actions disabled"
+                : publicConfig?.chainId === 42220
+                  ? "Celo mainnet · reviewed assets and oracle policy required"
+                  : publicConfig?.chainId === 11142220
+                    ? "Celo Sepolia · synthetic test asset · no event credit"
+                    : "Local EVM · synthetic prices · SIMCOP mock token"}{" "}
+              · JACK-inspired runtime; upstream integration pending licensing.
+            </span>
+          </div>
+        </div>
+        <aside className="hero__rail" aria-label="Treasury status">
+          <div className="hero__rail-head">
+            <span>OPERATING STATUS</span>
+            <StatusPill tone="success">{data ? "Ready" : "Loading"}</StatusPill>
+          </div>
+          <div className="hero__rail-value">{data ? "01" : "—"}</div>
+          <p>obligation in the operator queue</p>
+          <div className="hero__rail-divider" />
+          <div className="hero__rail-row">
+            <span>Authorization</span>
+            <strong>
+              <Icon name="lock" size={14} /> Bounded
+            </strong>
+          </div>
+          <div className="hero__rail-row">
+            <span>Settlement rail</span>
+            <strong>
+              <Icon name="globe" size={14} /> Local token
+            </strong>
+          </div>
+        </aside>
       </section>
       {error && (
         <p role="alert" className="error">
@@ -266,50 +320,74 @@ export default function Page() {
         </div>
       ) : (
         <>
-          <section className="stats">
-            <article>
-              <label>{strings.balance}</label>
-              <h2>
-                {formatUnits(BigInt(data.balanceAtomic), data.config.decimals)}{" "}
-                <small>{data.config.symbol ?? "SIMCOP"}</small>
-              </h2>
-              <p>Read directly from the deployed token contract</p>
-            </article>
-            <article>
-              <label>LUKAS REFERENCE VALUE</label>
-              <h2>${formatUnits(BigInt(data.snapshot.indexUsdWad), 18)}</h2>
-              <p>{data.snapshot.trustMode} basket · USD per reference unit</p>
-            </article>
-            <article>
-              <label>SUPPLIER RECEIVED</label>
-              <h2>
-                {formatUnits(
-                  BigInt(data.recipientBalanceAtomic),
-                  data.config.decimals,
-                )}{" "}
-                <small>{data.config.symbol ?? "SIMCOP"}</small>
-              </h2>
-              <p>Actual balance on the configured chain</p>
-            </article>
+          <section className="stats" aria-label="Treasury metrics">
+            <MetricCard
+              label={strings.balance}
+              value={
+                <>
+                  {formatUnits(
+                    BigInt(data.balanceAtomic),
+                    data.config.decimals,
+                  )}{" "}
+                  <small>{data.config.symbol ?? "SIMCOP"}</small>
+                </>
+              }
+              note="Read directly from the configured token contract"
+              tone="success"
+              icon="wallet"
+            />
+            <MetricCard
+              label="LUKAS REFERENCE VALUE"
+              value={`$${formatUnits(BigInt(data.snapshot.indexUsdWad), 18)}`}
+              note={`${data.snapshot.trustMode} basket · USD per reference unit`}
+              tone="warning"
+              icon="pulse"
+            />
+            <MetricCard
+              label="SUPPLIER RECEIVED"
+              value={
+                <>
+                  {formatUnits(
+                    BigInt(data.recipientBalanceAtomic),
+                    data.config.decimals,
+                  )}{" "}
+                  <small>{data.config.symbol ?? "SIMCOP"}</small>
+                </>
+              }
+              note="Balance observed on the configured chain"
+              icon="receipt"
+            />
+            <MetricCard
+              label="POLICY EPOCH"
+              value={`0${data.policy.policyEpoch}`}
+              note={
+                data.policy.paused
+                  ? "Treasury is paused"
+                  : "Settlement policy active"
+              }
+              tone={data.policy.paused ? "warning" : "success"}
+              icon="shield"
+            />
           </section>
           <section className="workspace">
             <article className="compose">
-              <p className="eyebrow">BOUNDED AUTHORIZATION</p>
-              <h2>{strings.schedule}</h2>
-              <p>
-                One recipient. One token. One maximum. A signature authorizes
-                only these terms.
-              </p>
-              <button
+              <SectionHeading
+                title={strings.schedule}
+                description="One recipient. One token. One maximum. A signature authorizes only these terms."
+                icon="shield"
+              />
+              <Button
                 disabled={STATIC_DEMO || busy}
                 onClick={() => act(connect)}
+                variant={wallet ? "secondary" : "primary"}
+                icon={wallet ? "check" : "wallet"}
               >
                 {STATIC_DEMO
                   ? "Read-only static demo"
                   : wallet
                     ? "Wallet connected"
                     : strings.connect}
-              </button>
+              </Button>
               <details>
                 <summary>Optional text draft · deterministic parser</summary>
                 <label>
@@ -346,9 +424,8 @@ export default function Page() {
                 </button>
                 <p>Produces a draft only. It cannot sign or send money.</p>
               </details>
-              <label>
-                LUKAS denomination
-                <input
+              <Field label="LUKAS denomination" hint="18 decimals">
+                <TextInput
                   value={amount}
                   readOnly={STATIC_DEMO}
                   onChange={(e) => {
@@ -357,10 +434,12 @@ export default function Page() {
                   }}
                   inputMode="decimal"
                 />
-              </label>
-              <label>
-                Maximum {data.config.symbol ?? "SIMCOP"} settlement
-                <input
+              </Field>
+              <Field
+                label={`Maximum ${data.config.symbol ?? "SIMCOP"} settlement`}
+                hint="Signed cap"
+              >
+                <TextInput
                   value={cap}
                   readOnly={STATIC_DEMO}
                   onChange={(e) => {
@@ -369,10 +448,9 @@ export default function Page() {
                   }}
                   inputMode="decimal"
                 />
-              </label>
-              <label>
-                Supplier wallet
-                <input
+              </Field>
+              <Field label="Supplier wallet" hint="Allowlisted recipient">
+                <TextInput
                   value={recipient || data.config.recipient}
                   readOnly={STATIC_DEMO}
                   onChange={(e) => {
@@ -380,18 +458,16 @@ export default function Page() {
                     setDraft(null);
                   }}
                 />
-              </label>
-              <label>
-                Settlement token
+              </Field>
+              <Field label="Settlement token" hint="Allowlisted asset">
                 <select aria-label="Settlement token" disabled={STATIC_DEMO}>
                   <option>
                     {data.config.symbol ?? "SIMCOP"} · {data.config.token}
                   </option>
                 </select>
-              </label>
-              <label>
-                Due time (ISO-8601 with timezone; default in 15 seconds)
-                <input
+              </Field>
+              <Field label="Due time" hint="ISO-8601 with timezone">
+                <TextInput
                   placeholder="2026-10-30T12:00:00-05:00"
                   value={dueAt}
                   readOnly={STATIC_DEMO}
@@ -400,10 +476,9 @@ export default function Page() {
                     setDraft(null);
                   }}
                 />
-              </label>
-              <label>
-                Expiry (ISO-8601 with timezone; default in 1 hour)
-                <input
+              </Field>
+              <Field label="Expiry" hint="Defaults to one hour">
+                <TextInput
                   placeholder="2026-10-30T13:00:00-05:00"
                   value={deadline}
                   readOnly={STATIC_DEMO}
@@ -412,62 +487,48 @@ export default function Page() {
                     setDraft(null);
                   }}
                 />
-              </label>
-              <button disabled={!wallet || busy} onClick={() => act(prepare)}>
+              </Field>
+              <Button
+                disabled={!wallet || busy}
+                onClick={() => act(prepare)}
+                icon="arrow-up-right"
+              >
                 Review exact terms
-              </button>
+              </Button>
               {draft && (
                 <div className="review" data-draft-id={draft.id}>
                   <h3>Review before signing</h3>
+                  <DataList>
+                    <DataItem
+                      label="Quote"
+                      value={`${formatUnits(BigInt(draft.message.amountLukasWad), 18)} LUKAS → ${formatUnits(BigInt(draft.quoteAtomic), data.config.decimals)} ${data.config.symbol ?? "SIMCOP"}`}
+                    />
+                    <DataItem
+                      label="Signed cap"
+                      value={`${formatUnits(BigInt(draft.message.maxSettlementAtomic), data.config.decimals)} ${data.config.symbol ?? "SIMCOP"} · epoch ${draft.message.policyEpoch}`}
+                    />
+                    <DataItem
+                      label="Valid after"
+                      value={`${new Date(Number(draft.message.validAfter) * 1000).toLocaleString("en-US", { timeZone: "America/Bogota" })} (Bogotá)`}
+                    />
+                    <DataItem
+                      label="Vault / recipient"
+                      value={`${draft.message.vault} / ${draft.message.recipient}`}
+                      mono
+                    />
+                    <DataItem
+                      label="Deadline"
+                      value={`${new Date(Number(draft.message.deadline) * 1000).toLocaleString("en-US", { timeZone: "America/Bogota" })} (Bogotá)`}
+                    />
+                  </DataList>
                   <p>
-                    {formatUnits(BigInt(draft.message.amountLukasWad), 18)}{" "}
-                    LUKAS → quoted{" "}
-                    {formatUnits(
-                      BigInt(draft.quoteAtomic),
-                      data.config.decimals,
-                    )}{" "}
-                    {data.config.symbol ?? "SIMCOP"}
+                    Quote is indicative; execution uses a fresh accepted round
+                    within your signed cap. Methodology{" "}
+                    {draft.message.methodologyHash}.
                   </p>
-                  <p>
-                    Maximum{" "}
-                    {formatUnits(
-                      BigInt(draft.message.maxSettlementAtomic),
-                      data.config.decimals,
-                    )}{" "}
-                    {data.config.symbol ?? "SIMCOP"} · policy epoch{" "}
-                    {draft.message.policyEpoch}
-                  </p>
-                  <p>
-                    Due{" "}
-                    {new Date(
-                      Number(draft.message.validAfter) * 1000,
-                    ).toLocaleString("en-US", {
-                      timeZone: "America/Bogota",
-                    })}{" "}
-                    (Bogotá)
-                  </p>
-                  <p className="mono">
-                    Vault {draft.message.vault}
-                    <br />
-                    Recipient {draft.message.recipient}
-                    <br />
-                    Token {draft.message.settlementToken}
-                    <br />
-                    Methodology {draft.message.methodologyHash}
-                  </p>
-                  <p>
-                    Deadline{" "}
-                    {new Date(
-                      Number(draft.message.deadline) * 1000,
-                    ).toLocaleString("en-US", {
-                      timeZone: "America/Bogota",
-                    })}{" "}
-                    (Bogotá). Quote is indicative; execution uses a fresh
-                    accepted round within your signed cap.
-                  </p>
-                  <button disabled={busy} onClick={() => act(sign)}>
+                  <Button disabled={busy} onClick={() => act(sign)} icon="lock">
                     Sign bounded obligation
-                  </button>
+                  </Button>
                 </div>
               )}
               <p className="hint">
@@ -475,9 +536,12 @@ export default function Page() {
                 sign with local-only test identities.
               </p>
             </article>
-            <article className="queue">
-              <p className="eyebrow">DURABLE PAYMENT QUEUE</p>
-              <h2>Obligations & receipts</h2>
+            <article className="queue" id="obligations">
+              <SectionHeading
+                title="Obligations & receipts"
+                description="Every item carries its cap, state and chain-backed evidence."
+                icon="receipt"
+              />
               {data.obligations.length === 0 ? (
                 <p>No obligations yet. Create one or run the CLI demo.</p>
               ) : (
@@ -566,13 +630,12 @@ export default function Page() {
               )}
             </article>
           </section>
-          <section className="compose">
-            <h2>Owner controls</h2>
-            <p>
-              Only your wallet can pause, withdraw, cancel or change policy. A
-              prepared action becomes effective after its successful chain
-              transaction is verified.
-            </p>
+          <section className="compose" id="controls">
+            <SectionHeading
+              title="Owner controls"
+              description="Only your wallet can pause, withdraw, cancel or change policy. A prepared action becomes effective after its successful chain transaction is verified."
+              icon="sliders"
+            />
             <button
               disabled={!wallet || busy}
               onClick={() =>
@@ -762,9 +825,13 @@ export default function Page() {
               </div>
             )}
           </section>
-          <section className="compose">
-            <h2>{strings.readiness}</h2>
-            <p>
+          <section className="compose readiness-panel">
+            <SectionHeading
+              title={strings.readiness}
+              description="Evidence that the current policy can safely execute."
+              icon="pulse"
+            />
+            <p className="readiness-copy">
               Source: {data.snapshot.trustMode} · oldest component{" "}
               {new Date(
                 data.snapshot.oldestComponentUpdatedAt * 1000,
