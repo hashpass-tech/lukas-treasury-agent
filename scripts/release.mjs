@@ -4,8 +4,7 @@ import path from "node:path";
 import process from "node:process";
 
 const root = path.resolve(new URL("..", import.meta.url).pathname);
-const versioningCwd = path.join(root, ".specs");
-const versioningConfig = path.join(versioningCwd, "versioning.config.json");
+const versioningCli = path.join(root, "scripts", "versioning.mjs");
 const releaseType = process.argv[2] ?? "patch";
 const supportedTypes = new Set(["patch", "minor", "major"]);
 
@@ -78,20 +77,15 @@ run("pnpm", ["test"]);
 run("pnpm", ["build"]);
 run("pnpm", ["specs:validate"]);
 
-run(
-  "pnpm",
-  [
-    "exec",
-    "versioning",
-    "bump",
-    releaseType,
-    "--no-commit",
-    "--no-tag",
-    "--config",
-    versioningConfig,
-  ],
-  versioningCwd,
-);
+run(process.execPath, [
+  versioningCli,
+  "bump",
+  releaseType,
+  "--no-commit",
+  "--no-tag",
+  "--config",
+  "versioning.config.json",
+]);
 
 const packagePath = path.join(root, "package.json");
 const version = JSON.parse(fs.readFileSync(packagePath, "utf8")).version;
