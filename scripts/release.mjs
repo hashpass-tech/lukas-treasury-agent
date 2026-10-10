@@ -5,6 +5,7 @@ import process from "node:process";
 
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const versioningCwd = path.join(root, ".specs");
+const versioningConfig = path.join(versioningCwd, "versioning.config.json");
 const releaseType = process.argv[2] ?? "patch";
 const supportedTypes = new Set(["patch", "minor", "major"]);
 
@@ -87,7 +88,7 @@ run(
     "--no-commit",
     "--no-tag",
     "--config",
-    "versioning.config.json",
+    versioningConfig,
   ],
   versioningCwd,
 );
