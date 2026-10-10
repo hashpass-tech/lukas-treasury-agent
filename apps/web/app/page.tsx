@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
+import packageJson from "../../../package.json";
 import { staticDemoConfig, staticDemoData } from "./static-demo";
 import {
   BrandMark,
@@ -874,7 +875,8 @@ export default function Page() {
             reset at UTC midnight ·{" "}
             {publicConfig?.mainnetWrites
               ? "Reviewed mainnet writes enabled"
-              : "Mainnet writes disabled"}
+              : "Mainnet writes disabled"}{" "}
+            · Release v{packageJson.version}
           </footer>
         </>
       )}
