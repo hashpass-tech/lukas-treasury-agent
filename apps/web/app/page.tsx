@@ -97,7 +97,7 @@ export default function Page() {
     refresh();
     const id = setInterval(refresh, 2000);
     return () => clearInterval(id);
-  }, []);
+  }, [language]);
   async function act(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
