@@ -62,24 +62,16 @@ Issue #1 is tracked in the [.specs execution plan](.specs/PLAN.md), with an inte
 
 The main web interface is published as a read-only static demo at [hashpass-tech.github.io/lukas-treasury-agent](https://hashpass-tech.github.io/lukas-treasury-agent/). The Pages workflow builds the same Next.js app with deterministic local-demo data, so no API, wallet, private key or remote chain is used. Local development keeps the API-backed dashboard and wallet controls.
 
-## 📋 Latest Changes (v0.1.2)
+## 📋 Latest Changes (v0.1.3)
 
 ### Changed
 
-- 🐛 fix: preserve release metadata during bump
-- 🐛 fix: accept linked versioning changelog headings
-- 🛠️ fix: run specs versioning from workspace root
-- 🐛 fix: resolve versioning config during release
-- 🧹 chore: refresh Pages action versions
-- 🚀 feat: publish static web demo to GitHub Pages
-- 🔧 chore: guard releases with versioning and husky
-
-# Changelog
-
-All notable changes to LUKAS Treasury are recorded here. Version numbers follow semantic versioning.
+- 🐞 fix: preserve chain status contract
+- 📱 fix: make treasury layout mobile first
+- 🎨 feat: redesign treasury operator interface
 
 For full version history, see [CHANGELOG.md](./CHANGELOG.md) and [GitHub releases](https://github.com/hashpass-tech/lukas-treasury-agent/releases)
 
 ---
 
-<p align="center"><sub>Release <strong>v0.1.2</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated 2026-10-10</sub></p>
+<p align="center"><sub>Release <strong>v0.1.3</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated 2026-10-10</sub></p>

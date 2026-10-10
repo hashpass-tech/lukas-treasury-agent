@@ -1,3 +1,11 @@
+## [0.1.3](https://github.com/hashpass-tech/lukas-treasury-agent/compare/v0.1.2...v0.1.3) (2026-10-10)
+
+### Changed
+
+- 🐞 fix: preserve chain status contract
+- 📱 fix: make treasury layout mobile first
+- 🎨 feat: redesign treasury operator interface
+
 ## [0.1.2](https://github.com/hashpass-tech/lukas-treasury-agent/compare/v0.1.1...v0.1.2) (2026-10-10)
 
 ### Changed
