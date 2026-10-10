@@ -1,3 +1,9 @@
+## [0.1.4](https://github.com/hashpass-tech/lukas-treasury-agent/compare/v0.1.3...v0.1.4) (2026-10-10)
+
+### Changed
+
+- ✨ feat: show package version in web footer
+
 ## [0.1.3](https://github.com/hashpass-tech/lukas-treasury-agent/compare/v0.1.2...v0.1.3) (2026-10-10)
 
 ### Changed
