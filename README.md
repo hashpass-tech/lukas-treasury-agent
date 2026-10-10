@@ -52,3 +52,11 @@ Modes: LOCAL **31337**, CELO_SEPOLIA **11142220**, CELO_MAINNET_PILOT **42220**.
 Follow [signer setup](docs/signer.md), [Sepolia](docs/sepolia.md), [mainnet readiness](docs/mainnet-readiness.md), and [hackathon onboarding](docs/hackathon.md). Mainnet writes default off; actual official wFIAT, current accepted prices, canonical ERC-8004 identity, contract/cap review and bounded operator authorization are required. Registration tooling is verified against a clearly labeled test registry, not an existing canonical agent ID.
 
 [Architecture](docs/architecture.md), [API](docs/api.md), [security](docs/security.md), [runbook](docs/runbook.md), [source discovery](docs/discovery.md), [submission draft](docs/submission.md) and [demo](docs/demo-script.md) explain operation and evidence. Ganache uses a JavaScript fallback on Node 24; tests still execute actual EVM contracts. Native setup is verified. Optional Linux `docker compose up --build` and the GitHub Actions workflow are provided; neither Docker nor remote CI was executed in this environment.
+
+## Planned commerce pivot
+
+Issue #1 is tracked in the [.specs execution plan](.specs/PLAN.md), with an internal simulation MVP first and stable adapter ports for future HashPass/allied integrations. The verified versioning task workflow is documented in [.specs/README.md](.specs/README.md). The commerce simulation is now delivered locally; external operator validation, remote deployment and real-money work remain later evidence gates, while the original treasury simulation remains separate.
+
+---
+
+<p align="center"><sub>Release <strong>v0.1.1</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated 2026-10-10</sub></p>

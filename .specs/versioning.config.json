@@ -1,0 +1,19 @@
+{
+  "rootPackageJson": "../package.json",
+  "packages": [],
+  "changelogFile": "../CHANGELOG.md",
+  "conventionalCommits": true,
+  "syncDependencies": false,
+  "reentryStatus": {
+    "enabled": true,
+    "autoSync": false,
+    "hooks": {
+      "postVersion": false,
+      "postRelease": false
+    },
+    "files": {
+      "jsonPath": ".versioning/reentry.status.json",
+      "markdownPath": ".versioning/REENTRY.md"
+    }
+  }
+}

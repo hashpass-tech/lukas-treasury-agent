@@ -1,8 +1,13 @@
 .local
 node_modules
+.pnpm-store
 .next
 pnpm-lock.yaml
 apps/web/next-env.d.ts
 playwright-report
 test-results
 packages/contracts/*.sol
+
+# Exact generated output validated by @edcalderon/versioning
+.specs/.versioning/
+.specs/tasks/**/README.md
