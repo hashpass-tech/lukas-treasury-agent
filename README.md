@@ -23,25 +23,26 @@ Prices expire after five minutes; `pnpm demo:seed` refreshes them. Restart prese
 
 ## Commands
 
-| Command                                                 | Result                                                                                                                                   |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm demo:seed` / `pnpm demo:run`                      | Idempotent local obligations; verified local settlement                                                                                  |
-| `pnpm build` / `pnpm typecheck` / `pnpm lint`           | Solidity + production web build; strict types; formatting                                                                                |
-| `pnpm test`                                             | Arithmetic, snapshot, policy, storage, attribution, signer, parser, configuration and identity tests                                     |
-| `pnpm test:contracts`                                   | Native Foundry contract tests, including fuzz, malicious tokens and ERC-1271                                                             |
-| `pnpm test:integration`                                 | Actual isolated EVM/API/recovery/reorg/replacement tests                                                                                 |
-| `pnpm test:e2e`                                         | Browser signing, blocked payment and owner controls                                                                                      |
-| `pnpm test:sepolia-path`                                | Full remote deployment/funding/payment/restart path on a labeled local HTTPS emulator                                                    |
-| `pnpm signer:setup` / `pnpm signer:start`               | Private auth/recovery setup without a signing key; isolated HTTPS signer                                                                 |
-| `pnpm deploy:sepolia`                                   | Prepare testnet plan; `--broadcast` executes with provisioned operator signers                                                           |
-| `pnpm demo:sepolia`                                     | Prepare exact intent; `--broadcast` authorizes and executes the approved testnet demo                                                    |
-| `pnpm deploy:mainnet`                                   | Verify supplied token/source/identity evidence and prepare a hashed plan; guarded `--broadcast` requires explicit reviewed authorization |
-| `pnpm identity:prepare` / `pnpm identity:verify <hash>` | Prepare tagged canonical registration for wallet review; verify actual identity transaction and bindings                                 |
-| `pnpm snapshot:sync` / `pnpm oracle:sync`               | Validate native source data; publish accepted native/mirror rounds while preserving original timestamps                                  |
-| `pnpm dev:api` / `pnpm dev:worker`                      | Separate persistent processes for a configured deployment                                                                                |
-| `pnpm config:validate` / `pnpm pilot:check`             | Validate mode configuration; report required readiness evidence                                                                          |
-| `pnpm attribution:verify <hash>`                        | Decode actual transaction attribution through the official SDK                                                                           |
-| `pnpm evidence:export` / `pnpm demo:capture`            | Scrubbed private receipts/checkpoints; labeled local video/screenshots                                                                   |
+| Command                                                            | Result                                                                                                                                   |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm demo:seed` / `pnpm demo:run`                                 | Idempotent local obligations; verified local settlement                                                                                  |
+| `pnpm build` / `pnpm typecheck` / `pnpm lint`                      | Solidity + production web build; strict types; formatting                                                                                |
+| `pnpm test`                                                        | Arithmetic, snapshot, policy, storage, attribution, signer, parser, configuration and identity tests                                     |
+| `pnpm test:contracts`                                              | Native Foundry contract tests, including fuzz, malicious tokens and ERC-1271                                                             |
+| `pnpm test:integration`                                            | Actual isolated EVM/API/recovery/reorg/replacement tests                                                                                 |
+| `pnpm test:e2e`                                                    | Browser signing, blocked payment and owner controls                                                                                      |
+| `pnpm test:sepolia-path`                                           | Full remote deployment/funding/payment/restart path on a labeled local HTTPS emulator                                                    |
+| `pnpm signer:setup` / `pnpm signer:start`                          | Private auth/recovery setup without a signing key; isolated HTTPS signer                                                                 |
+| `pnpm deploy:sepolia`                                              | Prepare testnet plan; `--broadcast` executes with provisioned operator signers                                                           |
+| `pnpm demo:sepolia`                                                | Prepare exact intent; `--broadcast` authorizes and executes the approved testnet demo                                                    |
+| `pnpm deploy:mainnet`                                              | Verify supplied token/source/identity evidence and prepare a hashed plan; guarded `--broadcast` requires explicit reviewed authorization |
+| `pnpm identity:prepare` / `pnpm identity:verify <hash>`            | Prepare tagged canonical registration for wallet review; verify actual identity transaction and bindings                                 |
+| `pnpm snapshot:sync` / `pnpm oracle:sync`                          | Validate native source data; publish accepted native/mirror rounds while preserving original timestamps                                  |
+| `pnpm dev:api` / `pnpm dev:worker`                                 | Separate persistent processes for a configured deployment                                                                                |
+| `pnpm config:validate` / `pnpm pilot:check`                        | Validate mode configuration; report required readiness evidence                                                                          |
+| `pnpm attribution:verify <hash>`                                   | Decode actual transaction attribution through the official SDK                                                                           |
+| `pnpm evidence:export` / `pnpm demo:capture`                       | Scrubbed private receipts/checkpoints; labeled local video/screenshots                                                                   |
+| `pnpm release:patch` / `pnpm release:minor` / `pnpm release:major` | Guarded version bump, changelog/README sync, validation, commit, tag and push to `main`                                                  |
 
 Native scripts use exported variables and **do not automatically load `.env`**. `.env.example` contains safe public defaults/placeholders. Replace or unset `RPC_URL` when changing modes. Keep separate chain/database/manifest paths per network. SQLite is single-host WAL with transactional migrations, nonce uniqueness, renewable leases and private mode-0600 files. Remote recovery requires an authenticated encrypted journal and HTTPS signer/RPC.
 
@@ -56,6 +57,23 @@ Follow [signer setup](docs/signer.md), [Sepolia](docs/sepolia.md), [mainnet read
 ## Planned commerce pivot
 
 Issue #1 is tracked in the [.specs execution plan](.specs/PLAN.md), with an internal simulation MVP first and stable adapter ports for future HashPass/allied integrations. The verified versioning task workflow is documented in [.specs/README.md](.specs/README.md). The commerce simulation is now delivered locally; external operator validation, remote deployment and real-money work remain later evidence gates, while the original treasury simulation remains separate.
+
+## 📋 Latest Changes (v0.1.1)
+
+### Added
+
+- Internal commerce simulation with transport-neutral `commerce.v1` adapter ports.
+- Immutable policy, quote, reservation and booking snapshots with integer basis-point accounting.
+- Deterministic capacity, expiry, idempotency, payment, attendance and settlement behavior.
+- `.specs` task workspace managed through `@edcalderon/versioning@1.5.13`.
+- Follow-up tracking for domain/accounting work and future HashPass or allied adapters.
+
+### Documentation
+
+- Added commerce architecture, economics and interoperability documentation.
+- Recorded the internal-first MVP boundary and remaining external validation gates.
+
+For full version history, see [CHANGELOG.md](./CHANGELOG.md) and [GitHub releases](https://github.com/hashpass-tech/lukas-treasury-agent/releases)
 
 ---
 

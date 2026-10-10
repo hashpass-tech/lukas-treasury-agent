@@ -37,9 +37,17 @@
     "demo:capture": "tsx scripts/capture-demo.ts",
     "signer:setup": "tsx scripts/signer-setup.ts",
     "signer:start": "tsx scripts/signer.ts",
-    "specs:list": "cd .specs && pnpm dlx @edcalderon/versioning@1.5.13 tasks list",
-    "specs:sync": "cd .specs && pnpm dlx @edcalderon/versioning@1.5.13 tasks sync",
-    "specs:validate": "cd .specs && pnpm dlx @edcalderon/versioning@1.5.13 tasks validate"
+    "specs:list": "cd .specs && pnpm exec versioning tasks list",
+    "specs:sync": "cd .specs && pnpm exec versioning tasks sync",
+    "specs:validate": "cd .specs && pnpm exec versioning tasks validate",
+    "versioning:readme": "pnpm exec versioning update-readme --readme README.md --changelog CHANGELOG.md --pkg package.json",
+    "versioning:changelog:check": "pnpm exec versioning check-changelog --changelog CHANGELOG.md",
+    "versioning:metadata:check": "node scripts/check-release-metadata.mjs",
+    "release:metadata:check": "node scripts/check-release-metadata.mjs",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major",
+    "prepare": "husky"
   },
   "dependencies": {
     "@celo/attribution-tags": "0.5.0",
@@ -55,12 +63,14 @@
     "zod": "4.1.12"
   },
   "devDependencies": {
+    "@edcalderon/versioning": "1.5.13",
     "@foundry-rs/forge": "1.7.1",
     "@playwright/test": "1.56.1",
     "@types/node": "24.10.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "fast-check": "4.3.0",
+    "husky": "9.1.7",
     "prettier": "3.6.2",
     "tsx": "4.20.6",
     "typescript": "5.9.3",

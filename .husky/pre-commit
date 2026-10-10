@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+echo "🔒 Running @edcalderon/versioning staged-secrets guard…"
+pnpm exec versioning check-secrets
+
+echo "📝 Checking changelog and README release metadata…"
+VERSION="$(node -p "require('./package.json').version")"
+pnpm exec versioning check-changelog --version "$VERSION"
+pnpm release:metadata:check
+
+echo "📚 Validating .specs task workspace…"
+pnpm specs:validate
+
+echo "✅ Running lint/type checks…"
+pnpm lint
