@@ -62,14 +62,16 @@ Issue #1 is tracked in the [.specs execution plan](.specs/PLAN.md), with an inte
 
 The main web interface is published as a read-only static demo at [hashpass-tech.github.io/lukas-treasury-agent](https://hashpass-tech.github.io/lukas-treasury-agent/). The Pages workflow builds the same Next.js app with deterministic local-demo data, so no API, wallet, private key or remote chain is used. Local development keeps the API-backed dashboard and wallet controls.
 
-## 📋 Latest Changes (v0.1.4)
+## 📋 Latest Changes (v0.1.5)
 
 ### Changed
 
-- ✨ feat: show package version in web footer
+- 🌍 fix: refresh runtime copy on locale change
+- 🌍 feat: add multilingual treasury interface
+- 🎨 feat: refine treasury visual system
 
 For full version history, see [CHANGELOG.md](./CHANGELOG.md) and [GitHub releases](https://github.com/hashpass-tech/lukas-treasury-agent/releases)
 
 ---
 
-<p align="center"><sub>Release <strong>v0.1.4</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated 2026-10-10</sub></p>
+<p align="center"><sub>Release <strong>v0.1.5</strong> · <a href="CHANGELOG.md">Changelog</a> · Updated 2026-10-10</sub></p>

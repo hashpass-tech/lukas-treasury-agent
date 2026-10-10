@@ -1,3 +1,11 @@
+## [0.1.5](https://github.com/hashpass-tech/lukas-treasury-agent/compare/v0.1.4...v0.1.5) (2026-10-10)
+
+### Changed
+
+- 🌍 fix: refresh runtime copy on locale change
+- 🌍 feat: add multilingual treasury interface
+- 🎨 feat: refine treasury visual system
+
 ## [0.1.4](https://github.com/hashpass-tech/lukas-treasury-agent/compare/v0.1.3...v0.1.4) (2026-10-10)
 
 ### Changed
