@@ -242,7 +242,8 @@ export default function Page() {
         </nav>
         <div className="topbar__actions">
           <StatusPill tone={STATIC_DEMO ? "warning" : "success"} icon="pulse">
-            {publicConfig?.mode ?? "Connecting"}
+            {publicConfig?.mode ?? "Connecting"} · CHAIN{" "}
+            {publicConfig?.chainId ?? "…"}
           </StatusPill>
           <span className="chain-chip">
             <Icon name="globe" size={14} /> Chain {publicConfig?.chainId ?? "…"}
