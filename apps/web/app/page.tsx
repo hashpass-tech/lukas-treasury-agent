@@ -1,9 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
+import { staticDemoConfig, staticDemoData } from "./static-demo";
+
+const STATIC_DEMO = process.env.NEXT_PUBLIC_STATIC_DEMO === "true";
+
 export default function Page() {
-  const [data, setData] = useState<any>(),
-    [publicConfig, setPublicConfig] = useState<any>(),
+  const [data, setData] = useState<any>(
+      STATIC_DEMO ? staticDemoData : undefined,
+    ),
+    [publicConfig, setPublicConfig] = useState<any>(
+      STATIC_DEMO ? staticDemoConfig : undefined,
+    ),
     [recipient, setRecipient] = useState(""),
     [dueAt, setDueAt] = useState(""),
     [deadline, setDeadline] = useState(""),
@@ -24,6 +32,8 @@ export default function Page() {
     [draft, setDraft] = useState<any>(),
     [busy, setBusy] = useState(false);
   async function request(path: string, body?: unknown, key?: string) {
+    if (STATIC_DEMO)
+      throw new Error("This GitHub Pages build is a read-only static demo.");
     const r = await fetch("/api" + path, {
       method: body ? "POST" : "GET",
       headers: body
@@ -39,6 +49,7 @@ export default function Page() {
     return result;
   }
   useEffect(() => {
+    if (STATIC_DEMO) return;
     const refresh = () =>
       request("/v1/treasury")
         .then(setData)
@@ -205,7 +216,7 @@ export default function Page() {
   return (
     <main>
       <header>
-        <a className="brand" href="/">
+        <a className="brand" href="./">
           L<span>U</span>KAS <small>TREASURY</small>
         </a>
         <span className="badge">
@@ -231,11 +242,13 @@ export default function Page() {
           token, within terms you sign.
         </p>
         <div className="notice">
-          {publicConfig?.chainId === 42220
-            ? "Celo mainnet · reviewed assets and oracle policy required"
-            : publicConfig?.chainId === 11142220
-              ? "Celo Sepolia · TESTCOP synthetic test asset · no event credit"
-              : "Local EVM and synthetic prices · SIMCOP is a mock token"}{" "}
+          {STATIC_DEMO
+            ? "GitHub Pages static demo · API and wallet actions disabled"
+            : publicConfig?.chainId === 42220
+              ? "Celo mainnet · reviewed assets and oracle policy required"
+              : publicConfig?.chainId === 11142220
+                ? "Celo Sepolia · TESTCOP synthetic test asset · no event credit"
+                : "Local EVM and synthetic prices · SIMCOP is a mock token"}{" "}
           · JACK-inspired runtime; upstream integration pending licensing.
         </div>
       </section>
@@ -287,8 +300,15 @@ export default function Page() {
                 One recipient. One token. One maximum. A signature authorizes
                 only these terms.
               </p>
-              <button disabled={busy} onClick={() => act(connect)}>
-                {wallet ? "Wallet connected" : strings.connect}
+              <button
+                disabled={STATIC_DEMO || busy}
+                onClick={() => act(connect)}
+              >
+                {STATIC_DEMO
+                  ? "Read-only static demo"
+                  : wallet
+                    ? "Wallet connected"
+                    : strings.connect}
               </button>
               <details>
                 <summary>Optional text draft · deterministic parser</summary>
@@ -297,6 +317,7 @@ export default function Page() {
                   <textarea
                     value={draftText}
                     onChange={(e) => setDraftText(e.target.value)}
+                    readOnly={STATIC_DEMO}
                     placeholder={`pay 1 LUKAS to ${data.config.recipient} max 500 ${data.config.symbol ?? "SIMCOP"} due 2026-10-30T10:00:00-05:00 until 2026-10-30T11:00:00-05:00`}
                   />
                 </label>
@@ -329,6 +350,7 @@ export default function Page() {
                 LUKAS denomination
                 <input
                   value={amount}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => {
                     setAmount(e.target.value);
                     setDraft(null);
@@ -340,6 +362,7 @@ export default function Page() {
                 Maximum {data.config.symbol ?? "SIMCOP"} settlement
                 <input
                   value={cap}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => {
                     setCap(e.target.value);
                     setDraft(null);
@@ -351,6 +374,7 @@ export default function Page() {
                 Supplier wallet
                 <input
                   value={recipient || data.config.recipient}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => {
                     setRecipient(e.target.value);
                     setDraft(null);
@@ -359,7 +383,7 @@ export default function Page() {
               </label>
               <label>
                 Settlement token
-                <select aria-label="Settlement token">
+                <select aria-label="Settlement token" disabled={STATIC_DEMO}>
                   <option>
                     {data.config.symbol ?? "SIMCOP"} · {data.config.token}
                   </option>
@@ -370,6 +394,7 @@ export default function Page() {
                 <input
                   placeholder="2026-10-30T12:00:00-05:00"
                   value={dueAt}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => {
                     setDueAt(e.target.value);
                     setDraft(null);
@@ -381,6 +406,7 @@ export default function Page() {
                 <input
                   placeholder="2026-10-30T13:00:00-05:00"
                   value={deadline}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => {
                     setDeadline(e.target.value);
                     setDraft(null);
@@ -561,6 +587,7 @@ export default function Page() {
               Funding amount
               <input
                 value={fundAmount}
+                readOnly={STATIC_DEMO}
                 onChange={(e) => setFundAmount(e.target.value)}
                 inputMode="decimal"
               />
@@ -581,6 +608,7 @@ export default function Page() {
               Withdrawal amount
               <input
                 value={withdrawAmount}
+                readOnly={STATIC_DEMO}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 inputMode="decimal"
               />
@@ -610,6 +638,7 @@ export default function Page() {
                 Recipient to configure
                 <input
                   value={allowedRecipient}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => setAllowedRecipient(e.target.value)}
                 />
               </label>
@@ -637,6 +666,7 @@ export default function Page() {
                 Per-payment token limit
                 <input
                   value={perPaymentLimit}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => setPerPaymentLimit(e.target.value)}
                   inputMode="decimal"
                 />
@@ -645,6 +675,7 @@ export default function Page() {
                 Daily token limit
                 <input
                   value={dailyLimit}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => setDailyLimit(e.target.value)}
                   inputMode="decimal"
                 />
@@ -672,6 +703,7 @@ export default function Page() {
                 Maximum source age (seconds)
                 <input
                   value={oracleAge}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => setOracleAge(e.target.value)}
                   inputMode="numeric"
                 />
@@ -688,6 +720,7 @@ export default function Page() {
                 Replacement executor
                 <input
                   value={nextExecutor}
+                  readOnly={STATIC_DEMO}
                   onChange={(e) => setNextExecutor(e.target.value)}
                 />
               </label>

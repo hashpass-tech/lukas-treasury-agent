@@ -58,6 +58,10 @@ Follow [signer setup](docs/signer.md), [Sepolia](docs/sepolia.md), [mainnet read
 
 Issue #1 is tracked in the [.specs execution plan](.specs/PLAN.md), with an internal simulation MVP first and stable adapter ports for future HashPass/allied integrations. The verified versioning task workflow is documented in [.specs/README.md](.specs/README.md). The commerce simulation is now delivered locally; external operator validation, remote deployment and real-money work remain later evidence gates, while the original treasury simulation remains separate.
 
+## Static GitHub Pages demo
+
+The main web interface is published as a read-only static demo at [hashpass-tech.github.io/lukas-treasury-agent](https://hashpass-tech.github.io/lukas-treasury-agent/). The Pages workflow builds the same Next.js app with deterministic local-demo data, so no API, wallet, private key or remote chain is used. Local development keeps the API-backed dashboard and wallet controls.
+
 ## 📋 Latest Changes (v0.1.1)
 
 ### Added
