@@ -8,8 +8,9 @@ const version = JSON.parse(read("package.json")).version;
 const changelog = read("CHANGELOG.md");
 const readme = read("README.md");
 
+const escapedVersion = version.replaceAll(".", "\\.");
 const changelogHeading = new RegExp(
-  `^## (?:\\[${version.replaceAll(".", "\\.")}\\]|${version})(?:\\s|$)`,
+  `^## (?:\\[${escapedVersion}\\](?:\\([^\\n]+\\))?|${escapedVersion})(?:\\s|$)`,
   "m",
 );
 const latestChangesHeading = `## 📋 Latest Changes (v${version})`;

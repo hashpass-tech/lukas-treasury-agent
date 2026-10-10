@@ -92,8 +92,9 @@ const version = JSON.parse(fs.readFileSync(packagePath, "utf8")).version;
 const date = new Date().toISOString().slice(0, 10);
 const changelogPath = path.join(root, "CHANGELOG.md");
 const changelog = fs.readFileSync(changelogPath, "utf8");
+const escapedVersion = version.replaceAll(".", "\\.");
 const heading = new RegExp(
-  `^## ${version.replaceAll(".", "\\.")} \\([^\\n]+\\)\\n(?:\\n)*`,
+  `^## (?:${escapedVersion}|\\[${escapedVersion}\\](?:\\([^\\n]+\\))?) \\([^\\n]+\\)\\n(?:\\n)*`,
   "m",
 );
 if (!heading.test(changelog))
